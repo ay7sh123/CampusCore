@@ -1,0 +1,448 @@
+{% extends "base.html" %}
+{% block title %}Attendance &bull; CAMPUSCORE{% endblock %}
+{% block header_title %}
+  {% if admin_mode %}Attendance Reports &amp; Audit Logs (Read-Only)
+  {% elif teacher_mode %}Classroom Attendance Management
+  {% else %}My Attendance &amp; 75% Bunk Planner{% endif %}
+{% endblock %}
+{% block header_subtitle %}
+  {% if admin_mode %}Platform-wide attendance records, student tracking &amp; audit reports
+  {% elif teacher_mode %}Record daily attendance for your assigned students
+  {% else %}Monitor your class presence, attendance streaks &amp; calculate safe bunk margins{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-7xl mx-auto">
+
+  <!-- ============================================================== -->
+  <!-- 1. ADMIN MODE: READ-ONLY ATTENDANCE OVERVIEW & REPORTS         -->
+  <!-- ============================================================== -->
+  {% if admin_mode %}
+  <div class="bg-[#161c2e] rounded-3xl p-6 sm:p-8 border border-[#38405f] shadow-xl space-y-6">
+    
+    <!-- Read-Only Policy Banner -->
+    <div class="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs flex items-center gap-3">
+      <i data-lucide="shield-alert" class="w-6 h-6 shrink-0 text-blue-400"></i>
+      <div>
+        <span class="font-extrabold text-sm block text-white">Institutional Administrator Read-Only Oversight</span>
+        <span>Admins have centralized viewing and reporting access across all departments. To maintain academic integrity, <strong>marking, modifying, or deleting attendance is exclusively reserved for faculty teachers</strong>.</span>
+      </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <form method="GET" action="{{ url_for('attendance_view') }}" class="p-5 rounded-2xl bg-[#0e131f] border border-[#38405f] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-[#8b939c] mb-1">Filter by Teacher</label>
+        <select name="teacher_id" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-xl border border-[#38405f] text-xs font-semibold text-white bg-[#161c2e] outline-none focus:border-[#ff0035]">
+          <option value="">All Faculty Teachers</option>
+          {% for t in all_teachers %}
+          <option value="{{ t._id }}" {% if selected_teacher == (t._id|string) %}selected{% endif %}>{{ t.name }} ({{ t.department }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-[#8b939c] mb-1">Filter by Student</label>
+        <select name="student_id" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-xl border border-[#38405f] text-xs font-semibold text-white bg-[#161c2e] outline-none focus:border-[#ff0035]">
+          <option value="">All Students</option>
+          {% for s in all_students %}
+          <option value="{{ s.user_id or s._id }}" {% if selected_student == (s.user_id|string) or selected_student == (s._id|string) or selected_student == s.roll_no %}selected{% endif %}>
+            {{ s.name }} ({{ s.roll_no }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-[#8b939c] mb-1">Status</label>
+        <select name="status" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-xl border border-[#38405f] text-xs font-semibold text-white bg-[#161c2e] outline-none focus:border-[#ff0035]">
+          <option value="">All Statuses</option>
+          {% for st in statuses %}
+          <option value="{{ st }}" {% if selected_status == st %}selected{% endif %}>{{ st }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-[#8b939c] mb-1">Date</label>
+        <input type="date" name="date" value="{{ selected_date }}" onchange="this.form.submit()" class="w-full px-3 py-2 rounded-xl border border-[#38405f] text-xs font-semibold text-white bg-[#161c2e] outline-none focus:border-[#ff0035]">
+      </div>
+
+      <div class="flex items-end gap-2">
+        <button type="submit" class="flex-1 py-2 rounded-xl font-bold text-xs text-white bg-[#ff0035] hover:bg-[#d6002c]">
+          Apply Filter
+        </button>
+        <a href="{{ url_for('attendance_view') }}" class="p-2 rounded-xl border border-[#38405f] text-[#8b939c] hover:text-white" title="Reset Filters">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+        </a>
+      </div>
+    </form>
+
+    <!-- Summary Statistics KPI Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="bg-[#0e131f] p-4 rounded-2xl border border-[#38405f] text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Total Records</span>
+        <div class="text-2xl font-extrabold text-white mt-1">{{ total_records }}</div>
+      </div>
+      <div class="bg-[#0e131f] p-4 rounded-2xl border border-[#38405f] text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Present Count</span>
+        <div class="text-2xl font-extrabold text-emerald-400 mt-1">{{ present_count }}</div>
+      </div>
+      <div class="bg-[#0e131f] p-4 rounded-2xl border border-[#38405f] text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Absent Count</span>
+        <div class="text-2xl font-extrabold text-[#ff0035] mt-1">{{ absent_count }}</div>
+      </div>
+      <div class="bg-[#0e131f] p-4 rounded-2xl border border-[#38405f] text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Average Attendance</span>
+        <div class="text-2xl font-extrabold text-white mt-1">{{ attendance_pct }}%</div>
+      </div>
+    </div>
+
+    <!-- Attendance Records Table (Read-Only) -->
+    <div class="overflow-x-auto rounded-2xl border border-[#38405f]">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead>
+          <tr class="bg-[#0e131f] text-[11px] font-bold uppercase tracking-wider text-[#8b939c] border-b border-[#38405f]">
+            <th class="p-4">Date</th>
+            <th class="p-4">Student</th>
+            <th class="p-4">Marked By Faculty</th>
+            <th class="p-4">Subject</th>
+            <th class="p-4">Status</th>
+            <th class="p-4 text-right">Timestamp</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[#38405f]/40">
+          {% for r in records %}
+          <tr class="hover:bg-[#0e131f]/50">
+            <td class="p-4 font-mono font-bold text-white">{{ r.date }}</td>
+            <td class="p-4">
+              <span class="font-bold text-white">{{ r.student_name }}</span>
+              <span class="text-[#8b939c] font-mono text-[11px] block">{{ r.student_roll }}</span>
+            </td>
+            <td class="p-4 text-[#8b939c]">{{ r.teacher_name or 'Faculty' }}</td>
+            <td class="p-4 text-slate-300 font-medium">{{ r.subject }}</td>
+            <td class="p-4">
+              <span class="px-2.5 py-0.5 rounded font-bold text-[10px] {% if r.status in ('Present', 'present') %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30{% else %}bg-[#ff0035]/20 text-[#ff0035] border border-[#ff0035]/30{% endif %}">
+                {{ r.status }}
+              </span>
+            </td>
+            <td class="p-4 text-right text-[#8b939c] font-mono text-[11px]">
+              {{ r.timestamp.strftime('%Y-%m-%d %H:%M') if r.timestamp else '' }}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="p-8 text-center text-[#8b939c]">
+              No attendance records found matching the selected filter criteria.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+
+  <!-- ============================================================== -->
+  <!-- 2. TEACHER MODE: ROSTER ATTENDANCE MARKING FOR ASSIGNED STUDENTS-->
+  <!-- ============================================================== -->
+  {% elif teacher_mode %}
+  <div class="bg-[#161c2e] rounded-3xl p-6 sm:p-8 border border-[#38405f] shadow-xl space-y-6">
+    
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#38405f]">
+      <div>
+        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+          <i data-lucide="calendar-check" class="w-6 h-6 text-[#ff0035]"></i>
+          <span>Classroom Attendance Management</span>
+        </h2>
+        <p class="text-xs text-[#8b939c] mt-1">
+          Mark and update attendance for your assigned students. Only you have authority over your assigned students.
+        </p>
+      </div>
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0e131f] border border-[#38405f] text-xs font-semibold text-white">
+        <span>👨‍🏫 {{ me.name }} &bull; {{ students|length }} Assigned Students</span>
+      </div>
+    </div>
+
+    <!-- Date & Course Selection Form -->
+    <form method="GET" action="{{ url_for('attendance_view') }}" class="p-5 rounded-2xl bg-[#0e131f] border border-[#38405f] grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-[#8b939c] mb-1">Select Teaching Course *</label>
+        <select name="course" onchange="this.form.submit()" class="w-full px-3.5 py-2.5 rounded-xl border border-[#38405f] text-sm font-semibold text-white bg-[#161c2e] outline-none focus:border-[#ff0035]">
+          <option value="">-- Choose Course ({{ courses|length }} Available) --</option>
+          {% for c in courses %}
+          <option value="{{ c._id }}" {% if cid == (c._id|string) %}selected{% endif %}>
+            {{ c.code }} - {{ c.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-[#8b939c] mb-1">Session Date *</label>
+        <input type="date" name="date" value="{{ day }}" onchange="this.form.submit()" class="w-full px-3.5 py-2.5 rounded-xl border border-[#38405f] text-sm font-semibold text-white bg-[#161c2e] outline-none focus:border-[#ff0035]">
+      </div>
+
+      <div class="flex items-end">
+        <button type="submit" class="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white bg-[#38405f] hover:bg-[#59546c]">
+          Refresh Roster
+        </button>
+      </div>
+    </form>
+
+    {% if students %}
+    <!-- Roster Attendance Marking Form -->
+    <form method="POST" action="{{ url_for('attendance_mark') }}">
+      <input type="hidden" name="date" value="{{ day }}">
+      <input type="hidden" name="subject" value="{{ selected_course.name if selected_course else 'General' }}">
+      <input type="hidden" name="save_roster" value="1">
+
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-sm font-bold text-white">Student Attendance Roster for {{ day }}</h3>
+          <p class="text-xs text-[#8b939c]">Select status for each student below and click Save</p>
+        </div>
+        <button type="button" onclick="markAllPresent()" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-bold transition-colors">
+          ⚡ Mark All Present
+        </button>
+      </div>
+
+      <div class="overflow-x-auto rounded-2xl border border-[#38405f]">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-[#0e131f] text-[11px] font-bold uppercase tracking-wider text-[#8b939c] border-b border-[#38405f]">
+              <th class="p-4">Roll No</th>
+              <th class="p-4">Student Name</th>
+              <th class="p-4">Overall %</th>
+              <th class="p-4 text-center">Status for {{ day }}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[#38405f]/40">
+            {% for s in students %}
+            {% set st_uid = s.user_id or (s._id|string) %}
+            {% set cur_st = existing.get(st_uid, 'Present') %}
+            <tr class="hover:bg-[#0e131f]/50">
+              <td class="p-4 font-mono font-bold text-[#ff0035]">{{ s.roll_no }}</td>
+              <td class="p-4 font-semibold text-white">
+                <a href="{{ url_for('student_profile_view', sid=s.user_id or s._id) }}" class="hover:underline text-white">
+                  {{ s.name }}
+                </a>
+              </td>
+              <td class="p-4">
+                <span class="font-bold {% if s.attendance_pct >= 75 %}text-emerald-400{% else %}text-[#ff0035]{% endif %}">
+                  {{ s.attendance_pct }}%
+                </span>
+              </td>
+              <td class="p-4">
+                <div class="flex items-center justify-center gap-4">
+                  {% for opt in statuses %}
+                  <label class="inline-flex items-center gap-1.5 cursor-pointer font-semibold {% if opt == 'Present' %}text-emerald-400{% elif opt == 'Absent' %}text-[#ff0035]{% else %}text-amber-400{% endif %}">
+                    <input type="radio" name="s_{{ s._id }}" value="{{ opt }}" {% if cur_st == opt %}checked{% endif %} class="accent-[#ff0035] roster-status-radio" data-status="{{ opt }}">
+                    <span>{{ opt }}</span>
+                  </label>
+                  {% endfor %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-6 flex justify-end">
+        <button type="submit" class="px-6 py-3 rounded-xl font-bold text-sm text-white bg-[#ff0035] hover:bg-[#d6002c] shadow-lg shadow-[#ff0035]/25 flex items-center gap-2">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>Save Classroom Attendance</span>
+        </button>
+      </div>
+    </form>
+    {% else %}
+    <div class="text-center py-10 bg-[#0e131f] rounded-2xl border border-dashed border-[#38405f]">
+      <p class="text-sm font-bold text-white">No students assigned to your profile yet.</p>
+      <p class="text-xs text-[#8b939c] mt-1">Please ask the Administrator to assign students to you.</p>
+    </div>
+    {% endif %}
+
+    <!-- Recent Attendance Records Logged by This Teacher -->
+    <div class="pt-6 border-t border-[#38405f]">
+      <h3 class="text-sm font-bold text-white mb-3">Recent Attendance Logs Recorded By You</h3>
+      <div class="overflow-x-auto rounded-2xl border border-[#38405f]">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-[#0e131f] text-[11px] font-bold uppercase tracking-wider text-[#8b939c] border-b border-[#38405f]">
+              <th class="p-3">Date</th>
+              <th class="p-3">Student</th>
+              <th class="p-3">Subject</th>
+              <th class="p-3">Status</th>
+              <th class="p-3 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[#38405f]/40">
+            {% for h in history[:15] %}
+            <tr class="hover:bg-[#0e131f]/50">
+              <td class="p-3 font-mono text-white">{{ h.date }}</td>
+              <td class="p-3 font-semibold text-white">{{ h.student_name }} ({{ h.student_roll }})</td>
+              <td class="p-3 text-[#8b939c]">{{ h.subject }}</td>
+              <td class="p-3">
+                <span class="px-2 py-0.5 rounded font-bold text-[10px] {% if h.status in ('Present', 'present') %}bg-emerald-500/20 text-emerald-400{% else %}bg-[#ff0035]/20 text-[#ff0035]{% endif %}">
+                  {{ h.status }}
+                </span>
+              </td>
+              <td class="p-3 text-right">
+                <form method="POST" action="{{ url_for('attendance_delete', aid=h._id) }}" onsubmit="return confirm('Remove this attendance entry?');" class="inline">
+                  <button type="submit" class="text-xs text-[#ff0035] hover:underline font-bold">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5" class="p-4 text-center text-[#8b939c]">No previous records logged yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function markAllPresent() {
+      document.querySelectorAll('.roster-status-radio[data-status="Present"]').forEach(r => r.checked = true);
+    }
+  </script>
+
+
+  <!-- ============================================================== -->
+  <!-- 3. STUDENT MODE: PERSONAL ATTENDANCE & 75% BUNK PLANNER       -->
+  <!-- ============================================================== -->
+  {% else %}
+  <div class="space-y-6">
+
+    <!-- 75% Attendance Health Alert Banner -->
+    <div class="rounded-3xl p-6 sm:p-7 border transition-all {% if metrics.is_safe %}bg-emerald-500/10 border-emerald-500/30 text-emerald-300{% else %}bg-amber-500/10 border-amber-500/30 text-amber-300{% endif %} shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <div class="flex items-center gap-5">
+        <div class="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 {% if metrics.is_safe %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30{% else %}bg-amber-500/20 text-amber-400 border border-amber-500/30{% endif %}">
+          <i data-lucide="{% if metrics.is_safe %}shield-check{% else %}alert-triangle{% endif %}" class="w-8 h-8"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-xl font-extrabold text-white">
+              {% if metrics.is_safe %}
+                Eligible &bull; {{ metrics.percentage }}% Attendance Safe
+              {% else %}
+                Attendance Criteria Warning &bull; {{ metrics.percentage }}% (Below 75%)
+              {% endif %}
+            </h2>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider {% if metrics.is_safe %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% else %}bg-amber-500/20 text-amber-300 border border-amber-500/30{% endif %}">
+              75% Rule
+            </span>
+          </div>
+          <p class="text-xs sm:text-sm mt-1.5 text-slate-200">
+            {% if metrics.is_safe %}
+              You can safely bunk <strong class="text-white text-base">{{ metrics.can_bunk }} upcoming classes</strong> without dropping below the mandatory 75% exam threshold.
+            {% else %}
+              You must attend the next <strong class="text-white text-base">{{ metrics.need_to_attend }} consecutive classes</strong> to bring your overall attendance back to 75%.
+            {% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student Attendance Statistics Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="bg-[#161c2e] p-5 rounded-2xl border border-[#38405f] shadow-lg text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Overall Attendance</span>
+        <div class="text-3xl font-extrabold text-white mt-1">{{ metrics.percentage }}%</div>
+        <p class="text-[11px] text-[#8b939c] mt-1 font-medium">{{ metrics.total_days }} Total Sessions</p>
+      </div>
+
+      <div class="bg-[#161c2e] p-5 rounded-2xl border border-[#38405f] shadow-lg text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Present Count</span>
+        <div class="text-3xl font-extrabold text-emerald-400 mt-1">{{ metrics.present }}</div>
+        <p class="text-[11px] text-emerald-400 mt-1 font-medium">Classes Attended</p>
+      </div>
+
+      <div class="bg-[#161c2e] p-5 rounded-2xl border border-[#38405f] shadow-lg text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Absent Count</span>
+        <div class="text-3xl font-extrabold text-[#ff0035] mt-1">{{ metrics.absent }}</div>
+        <p class="text-[11px] text-[#ff0035] mt-1 font-medium">Classes Missed</p>
+      </div>
+
+      <div class="bg-[#161c2e] p-5 rounded-2xl border border-[#38405f] shadow-lg text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Daily Streak</span>
+        <div class="text-3xl font-extrabold text-amber-400 mt-1">{{ metrics.streak }}</div>
+        <p class="text-[11px] text-amber-400 mt-1 font-medium">Consecutive Days</p>
+      </div>
+    </div>
+
+    <!-- Subject Wise Breakdown -->
+    {% if subject_breakdowns %}
+    <div class="bg-[#161c2e] rounded-3xl p-6 border border-[#38405f] shadow-lg">
+      <h3 class="text-base font-bold text-white mb-4">Subject-Wise Attendance Breakdown</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for sb in subject_breakdowns %}
+        <div class="p-4 rounded-2xl bg-[#0e131f] border border-[#38405f]">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-bold text-white flex items-center gap-1.5">
+              <span>{{ sb.icon }}</span>
+              <span>{{ sb.name }}</span>
+            </span>
+            <span class="font-bold text-xs {% if sb.stats.percentage >= 75 %}text-emerald-400{% else %}text-[#ff0035]{% endif %}">
+              {{ sb.stats.percentage }}%
+            </span>
+          </div>
+          <div class="w-full bg-[#161c2e] h-2 rounded-full overflow-hidden border border-[#38405f]">
+            <div class="h-full rounded-full {% if sb.stats.percentage >= 75 %}bg-emerald-500{% else %}bg-[#ff0035]{% endif %}" style="width: {{ [sb.stats.percentage, 100]|min }}%"></div>
+          </div>
+          <div class="flex justify-between text-[11px] text-[#8b939c] mt-2">
+            <span>{{ sb.stats.present }} Present</span>
+            <span>{{ sb.stats.absent }} Absent</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Student Attendance History Table -->
+    <div class="bg-[#161c2e] rounded-3xl p-6 border border-[#38405f] shadow-lg">
+      <h3 class="text-base font-bold text-white mb-4">Your Classroom Attendance History</h3>
+      <div class="overflow-x-auto rounded-2xl border border-[#38405f]">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-[#0e131f] text-[11px] font-bold uppercase tracking-wider text-[#8b939c] border-b border-[#38405f]">
+              <th class="p-3.5">Date</th>
+              <th class="p-3.5">Subject</th>
+              <th class="p-3.5">Marked By Faculty</th>
+              <th class="p-3.5 text-right">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[#38405f]/40">
+            {% for r in metrics.records %}
+            <tr class="hover:bg-[#0e131f]/50">
+              <td class="p-3.5 font-mono text-white">{{ r.date }}</td>
+              <td class="p-3.5 text-slate-200 font-semibold">{{ r.subject or 'General' }}</td>
+              <td class="p-3.5 text-[#8b939c]">{{ r.teacher_name or 'Faculty' }}</td>
+              <td class="p-3.5 text-right">
+                <span class="px-2.5 py-0.5 rounded font-bold text-[10px] {% if r.status in ('Present', 'present') %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30{% else %}bg-[#ff0035]/20 text-[#ff0035] border border-[#ff0035]/30{% endif %}">
+                  {{ r.status }}
+                </span>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="4" class="p-8 text-center text-[#8b939c]">No attendance records logged for your account yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

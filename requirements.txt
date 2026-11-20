@@ -1,0 +1,6 @@
+Flask==3.0.3
+pymongo[srv]==4.8.0
+python-dotenv==1.0.1
+dnspython==2.6.1
+requests>=2.31.0
+markdown>=3.5.0

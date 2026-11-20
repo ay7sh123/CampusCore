@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Notices &bull; CAMPUSCORE{% endblock %}
+{% block header_title %}Campus Bulletin Board{% endblock %}
+{% block header_subtitle %}Official academic circulars, exam notifications &amp; campus events{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-5xl mx-auto">
+
+  <!-- Filter & Action Row -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <!-- Category Filter Pills -->
+    <div class="flex items-center gap-1.5 p-1 bg-[#131927] rounded-2xl border border-twilight/50 shadow-sm self-start">
+      <a href="{{ url_for('notices_list') }}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all {% if not cat_filter %}bg-strawberry text-white shadow-sm shadow-strawberry/30{% else %}text-steel hover:text-white{% endif %}">
+        All Circulars
+      </a>
+      <a href="{{ url_for('notices_list', category='Exam') }}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all {% if cat_filter == 'Exam' %}bg-strawberry text-white shadow-sm shadow-strawberry/30{% else %}text-steel hover:text-white{% endif %}">
+        📝 Exams
+      </a>
+      <a href="{{ url_for('notices_list', category='General') }}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all {% if cat_filter == 'General' %}bg-strawberry text-white shadow-sm shadow-strawberry/30{% else %}text-steel hover:text-white{% endif %}">
+        📢 General
+      </a>
+      <a href="{{ url_for('notices_list', category='Urgent') }}" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all {% if cat_filter == 'Urgent' %}bg-strawberry text-white shadow-sm shadow-strawberry/30{% else %}text-steel hover:text-white{% endif %}">
+        ⚠️ Urgent
+      </a>
+    </div>
+
+    {% if me.role in ('admin', 'teacher') %}
+    <button onclick="openNoticeModal()" class="px-4 py-2.5 rounded-xl font-bold text-xs text-white bg-strawberry hover:bg-strawberry/90 shadow-md shadow-strawberry/20 transition-all flex items-center gap-1.5 shrink-0">
+      <i data-lucide="plus" class="w-4 h-4"></i>
+      <span>Publish Announcement</span>
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- Notices List -->
+  {% if rows %}
+  <div class="space-y-4">
+    {% for n in rows %}
+    <div class="bg-[#131927] rounded-3xl p-6 border border-twilight/40 hover:border-strawberry/50 shadow-md transition-all group">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider {% if n.category in ('Exam', 'Urgent') %}bg-strawberry/20 text-strawberry border border-strawberry/30{% else %}bg-twilight/30 text-steel border border-twilight/50{% endif %}">
+              {{ n.category or 'General' }}
+            </span>
+            <span class="text-xs text-steel font-medium">
+              Published on {{ n.created.strftime('%d %B %Y') if n.created else '' }}
+            </span>
+          </div>
+
+          <h3 class="text-base font-bold text-white group-hover:text-strawberry transition-colors">
+            {{ n.title }}
+          </h3>
+
+          <p class="text-xs sm:text-sm text-steel mt-2 leading-relaxed whitespace-pre-line">
+            {{ n.body }}
+          </p>
+
+          <div class="mt-4 pt-3 border-t border-twilight/30 flex items-center gap-2 text-xs text-steel font-medium">
+            <i data-lucide="user-check" class="w-3.5 h-3.5 text-strawberry"></i>
+            <span>Signed by: <strong class="text-white">{{ n.author or 'Administration' }}</strong></span>
+          </div>
+        </div>
+
+        {% if me.role == 'admin' %}
+        <form method="POST" action="{{ url_for('notices_delete', nid=n._id) }}" onsubmit="return confirm('Remove this circular?');">
+          <button type="submit" class="p-2 rounded-xl text-steel hover:text-strawberry hover:bg-strawberry/10 transition-colors" title="Delete Notice">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-16 bg-[#131927] rounded-3xl border border-dashed border-twilight/50">
+    <i data-lucide="bell" class="w-12 h-12 text-steel/50 mx-auto mb-3"></i>
+    <h3 class="font-bold text-white text-base">No announcements found</h3>
+    <p class="text-xs text-steel mt-1">There are no circulars matching your active category.</p>
+  </div>
+  {% endif %}
+
+</div>
+
+{% if me.role in ('admin', 'teacher') %}
+<!-- Publish Notice Modal -->
+<div id="noticeModal" class="fixed inset-0 bg-ink/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-[#131927] rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-twilight/50 shadow-2xl animate-fade-in">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-strawberry/20 text-strawberry flex items-center justify-center font-bold">
+          <i data-lucide="megaphone" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">Publish Circular</h3>
+          <p class="text-[11px] text-steel">Broadcast announcement to campus bulletin</p>
+        </div>
+      </div>
+      <button onclick="closeNoticeModal()" class="text-steel hover:text-white">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{{ url_for('notices_add') }}" class="space-y-4">
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1">Title *</label>
+        <input type="text" name="title" required placeholder="e.g. Mid-Term Examination Datesheet 2026" class="w-full px-3.5 py-2.5 rounded-xl border border-twilight/50 text-sm font-medium text-white bg-ink/70 outline-none focus:border-strawberry transition-colors">
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1">Category</label>
+        <select name="category" class="w-full px-3.5 py-2.5 rounded-xl border border-twilight/50 text-sm font-medium text-white bg-ink/70 outline-none focus:border-strawberry transition-colors">
+          <option value="General" class="bg-ink text-white">📢 General Announcement</option>
+          <option value="Exam" class="bg-ink text-white">📝 Examination Cell</option>
+          <option value="Urgent" class="bg-ink text-white">⚠️ Urgent Action Required</option>
+          <option value="Event" class="bg-ink text-white">🎉 Campus Event / Holiday</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1">Message Body *</label>
+        <textarea name="body" rows="5" required placeholder="Type the circular details and instructions..." class="w-full px-3.5 py-2.5 rounded-xl border border-twilight/50 text-sm text-white bg-ink/70 outline-none focus:border-strawberry transition-colors"></textarea>
+      </div>
+
+      <div class="pt-2 flex items-center justify-end gap-3">
+        <button type="button" onclick="closeNoticeModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold text-steel hover:text-white hover:bg-twilight/30 transition-colors">Cancel</button>
+        <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-strawberry hover:bg-strawberry/90 shadow-md shadow-strawberry/20 transition-all">Publish Notice</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openNoticeModal() {
+    document.getElementById('noticeModal').classList.remove('hidden');
+  }
+  function closeNoticeModal() {
+    document.getElementById('noticeModal').classList.add('hidden');
+  }
+</script>
+{% endif %}
+{% endblock %}

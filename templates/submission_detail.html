@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Submission Details &bull; CAMPUSCORE{% endblock %}
+{% block header_title %}Student Submission Review{% endblock %}
+{% block header_subtitle %}Academic evaluation, solution review &amp; marks feedback{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-4xl mx-auto">
+
+  <!-- Back Link -->
+  <div>
+    <a href="{{ url_for('assignment_detail', aid=submission.assignment_id) }}" class="inline-flex items-center gap-1.5 text-xs font-bold text-[#8b939c] hover:text-white transition-colors">
+      <i data-lucide="arrow-left" class="w-4 h-4"></i>
+      <span>Back to Assignment</span>
+    </a>
+  </div>
+
+  <div class="bg-[#161c2e] rounded-3xl p-6 sm:p-8 border border-[#38405f] shadow-xl space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#38405f]">
+      <div>
+        <span class="text-xs font-bold text-[#ff0035] uppercase tracking-wider">{{ assignment.subject if assignment else 'Course' }}</span>
+        <h2 class="text-xl font-bold text-white mt-1">{{ submission.assignment_title }}</h2>
+        <p class="text-xs text-[#8b939c] mt-1">
+          Student: <strong class="text-white">{{ submission.student_name }}</strong> ({{ submission.student_roll }})
+        </p>
+      </div>
+
+      <div>
+        {% if submission.status == 'graded' %}
+        <span class="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 font-extrabold text-sm border border-emerald-500/30">
+          Graded: {{ submission.marks }} Marks
+        </span>
+        {% else %}
+        <span class="px-3 py-1 rounded-xl bg-amber-500/20 text-amber-400 font-bold text-xs border border-amber-500/30">
+          Awaiting Evaluation
+        </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Submitted Content -->
+    <div>
+      <span class="text-xs font-bold uppercase tracking-wider text-[#8b939c] block mb-2">Submitted Work / Repository</span>
+      <div class="p-4 rounded-2xl bg-[#0e131f] border border-[#38405f] text-xs font-mono text-slate-200 whitespace-pre-wrap leading-relaxed">
+        {{ submission.content }}
+      </div>
+      <p class="text-[11px] text-[#8b939c] mt-1.5">
+        Submitted at: {{ submission.submitted_at.strftime('%Y-%m-%d %H:%M:%S UTC') if submission.submitted_at else 'Recent' }}
+      </p>
+    </div>
+
+    <!-- Feedback Section -->
+    {% if submission.feedback %}
+    <div class="p-4 rounded-2xl bg-[#0e131f] border border-[#38405f]">
+      <span class="text-xs font-bold uppercase tracking-wider text-amber-400 block mb-1">Faculty Evaluation &amp; Feedback</span>
+      <p class="text-xs text-slate-200">{{ submission.feedback }}</p>
+    </div>
+    {% endif %}
+
+    <!-- If Teacher: Evaluation Form -->
+    {% if role == 'teacher' and me.id == submission.teacher_id %}
+    <div class="pt-4 border-t border-[#38405f]">
+      <h3 class="text-sm font-bold text-white mb-3">Provide Marks &amp; Feedback</h3>
+      <form method="POST" action="{{ url_for('submission_grade', sub_id=submission._id) }}" class="space-y-4">
+        <div class="w-48">
+          <label class="block text-xs font-bold uppercase tracking-wider text-[#8b939c] mb-1">Marks Obtained</label>
+          <input type="number" name="marks" value="{{ submission.marks or '' }}" required class="w-full px-3 py-2 rounded-xl border border-[#38405f] text-sm font-bold text-white bg-[#0e131f] outline-none focus:border-[#ff0035]">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-[#8b939c] mb-1">Teacher Feedback</label>
+          <textarea name="feedback" rows="3" class="w-full px-3.5 py-2.5 rounded-xl border border-[#38405f] text-xs text-white bg-[#0e131f] outline-none focus:border-[#ff0035]">{{ submission.feedback or '' }}</textarea>
+        </div>
+
+        <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#ff0035] hover:bg-[#d6002c] text-white text-xs font-bold shadow-md shadow-[#ff0035]/25">
+          Save Evaluation
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+  </div>
+
+</div>
+{% endblock %}

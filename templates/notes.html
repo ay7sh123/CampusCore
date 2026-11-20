@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block title %}Study Notes &bull; CAMPUSCORE{% endblock %}
+{% block header_title %}Subject Notes &amp; Lecture Materials{% endblock %}
+{% block header_subtitle %}Curriculum-aligned lecture notes, formulas, revision summaries, and printable resources{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-7xl mx-auto">
+
+  <!-- Top Action & Search Row -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <!-- Live Search & Subject Filter -->
+    <form method="GET" action="{{ url_for('notes_view') }}" class="flex flex-wrap items-center gap-2.5 flex-1 max-w-xl">
+      <div class="relative flex-1 min-w-[200px]">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-steel">
+          <i data-lucide="search" class="w-4 h-4"></i>
+        </div>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Search notes by title, keyword, or tag..." class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-twilight/50 text-xs font-medium text-white bg-ink/80 outline-none focus:border-strawberry transition-colors">
+      </div>
+
+      <select name="subject" onchange="this.form.submit()" class="px-3.5 py-2.5 rounded-xl border border-twilight/50 text-xs font-bold text-white bg-ink/80 outline-none focus:border-strawberry transition-colors">
+        <option value="" class="bg-ink text-white">All Subjects</option>
+        {% for s in subjects %}
+        <option value="{{ s.name }}" class="bg-ink text-white" {% if sub_filter == s.name %}selected{% endif %}>{{ s.icon }} {{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+
+    <!-- Trigger Action Button -->
+    <div class="flex items-center gap-2.5">
+      <button onclick="openNoteModal()" class="px-4 py-2.5 rounded-xl font-bold text-xs text-white bg-strawberry hover:bg-strawberry/90 shadow-md shadow-strawberry/20 transition-all flex items-center gap-1.5">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+        <span>Create Study Note</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Curriculum Library Banner -->
+  <div class="relative overflow-hidden rounded-3xl p-6 sm:p-7 border border-twilight/40 bg-gradient-to-r from-ink via-twilight/40 to-ink text-white shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div class="flex items-center gap-4">
+      <div class="w-12 h-12 rounded-2xl bg-strawberry/20 border border-strawberry/30 flex items-center justify-center text-strawberry shrink-0">
+        <i data-lucide="book-marked" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h3 class="font-extrabold text-base text-white">Course Repository &amp; Revision Guides</h3>
+        <p class="text-xs text-steel mt-0.5">Access comprehensive lecture notes formatted with Markdown equations, key definitions, and exam formulas.</p>
+      </div>
+    </div>
+    <button onclick="openNoteModal()" class="px-5 py-2.5 rounded-xl bg-ink border border-twilight hover:border-strawberry text-white font-bold text-xs shadow-sm transition-colors shrink-0">
+      + New Study Material
+    </button>
+  </div>
+
+  <!-- Notes Grid -->
+  {% if notes %}
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for n in notes %}
+    <div class="bg-[#131927] rounded-3xl p-6 border border-twilight/40 hover:border-strawberry/50 shadow-md transition-all flex flex-col justify-between group">
+      <div>
+        <!-- Badges Bar -->
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <span class="text-[11px] font-bold text-strawberry bg-strawberry/10 border border-strawberry/20 px-2.5 py-0.5 rounded-full truncate">
+            📘 {{ n.subject or 'General' }}
+          </span>
+          <span class="text-[10px] text-steel">
+            {{ n.updated_at.strftime('%d %b %Y') if n.updated_at else '' }}
+          </span>
+        </div>
+
+        <!-- Title -->
+        <h3 class="text-base font-bold text-white group-hover:text-strawberry transition-colors line-clamp-2">
+          {{ n.title }}
+        </h3>
+
+        <!-- Content Preview Snippet -->
+        <p class="text-xs text-steel mt-2 line-clamp-3 leading-relaxed">
+          {{ n.content|striptags|truncate(120) }}
+        </p>
+
+        <!-- Tags -->
+        {% if n.tags %}
+        <div class="flex flex-wrap gap-1 mt-3">
+          {% for t in n.tags.split(',') %}
+          <span class="px-2 py-0.5 rounded bg-twilight/40 border border-twilight/50 text-[10px] font-medium text-steel truncate max-w-[120px]">
+            #{{ t.strip() }}
+          </span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Card Action Footer -->
+      <div class="mt-6 pt-4 border-t border-twilight/30 flex items-center justify-between text-xs">
+        <!-- View / Read Note Button -->
+        <button onclick="readNote('{{ n._id }}', '{{ n.title|escape }}', '{{ n.subject|escape }}', {{ n.content|tojson }})" class="px-3 py-1.5 rounded-lg bg-strawberry/10 hover:bg-strawberry/20 text-strawberry font-bold text-xs flex items-center gap-1 transition-colors">
+          <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+          <span>Read Note</span>
+        </button>
+
+        <div class="flex items-center gap-1.5">
+          <!-- Download MD Button -->
+          <a href="{{ url_for('notes_download', nid=n._id, format='md') }}" title="Download Markdown" class="p-1.5 rounded-lg text-steel hover:text-white hover:bg-twilight/40 transition-colors">
+            <i data-lucide="download" class="w-4 h-4"></i>
+          </a>
+
+          <!-- Print PDF Button -->
+          <a href="{{ url_for('notes_download', nid=n._id, format='pdf') }}" target="_blank" title="Print to PDF" class="p-1.5 rounded-lg text-steel hover:text-white hover:bg-twilight/40 transition-colors">
+            <i data-lucide="printer" class="w-4 h-4"></i>
+          </a>
+
+          <!-- Delete -->
+          <form method="POST" action="{{ url_for('notes_delete', nid=n._id) }}" onsubmit="return confirm('Delete this study note?');">
+            <button type="submit" class="p-1.5 rounded-lg text-steel hover:text-strawberry hover:bg-strawberry/10 transition-colors">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-16 bg-[#131927] rounded-3xl border border-dashed border-twilight/50">
+    <i data-lucide="book-open" class="w-12 h-12 text-steel/50 mx-auto mb-3"></i>
+    <h3 class="font-bold text-white text-base">No notes found</h3>
+    <p class="text-xs text-steel mt-1 max-w-sm mx-auto">Create comprehensive course study guides and lecture notes for your subjects.</p>
+    <div class="mt-4 flex items-center justify-center">
+      <button onclick="openNoteModal()" class="px-4 py-2 rounded-xl bg-strawberry text-white text-xs font-bold shadow-md shadow-strawberry/20 hover:bg-strawberry/90 transition-all">
+        📝 Create First Note
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Manual Note Modal -->
+<div id="noteModal" class="fixed inset-0 bg-ink/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-[#131927] rounded-3xl p-6 sm:p-7 max-w-2xl w-full border border-twilight/50 shadow-2xl animate-fade-in">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-strawberry/20 text-strawberry flex items-center justify-center font-bold">
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">Create Study Note</h3>
+          <p class="text-[11px] text-steel">Add syllabus notes with full Markdown and LaTeX formula support</p>
+        </div>
+      </div>
+      <button onclick="closeNoteModal()" class="text-steel hover:text-white">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{{ url_for('notes_create') }}" class="space-y-4">
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1">Title *</label>
+        <input type="text" name="title" required placeholder="e.g. Newton's Laws of Motion &amp; Free Body Diagrams" class="w-full px-3.5 py-2.5 rounded-xl border border-twilight/50 text-sm font-medium text-white bg-ink/70 outline-none focus:border-strawberry transition-colors">
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1">Subject</label>
+          <select name="subject" class="w-full px-3.5 py-2.5 rounded-xl border border-twilight/50 text-sm font-medium text-white bg-ink/70 outline-none focus:border-strawberry transition-colors">
+            {% for s in subjects %}
+            <option value="{{ s.name }}" class="bg-ink text-white">{{ s.icon }} {{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1">Tags (Comma-separated)</label>
+          <input type="text" name="tags" placeholder="Physics, Mechanics, Exam Prep" class="w-full px-3.5 py-2.5 rounded-xl border border-twilight/50 text-sm font-medium text-white bg-ink/70 outline-none focus:border-strawberry transition-colors">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1">Markdown Content *</label>
+        <textarea name="content" rows="9" required placeholder="# Key Concepts&#10;&#10;Write comprehensive lecture notes here using Markdown and LaTeX formulas (e.g. $F = ma$).&#10;&#10;## Important Points&#10;- Point 1&#10;- Point 2" class="w-full px-3.5 py-2.5 rounded-xl border border-twilight/50 font-mono text-xs text-white bg-ink/70 outline-none focus:border-strawberry transition-colors"></textarea>
+      </div>
+
+      <div class="pt-2 flex items-center justify-end gap-3">
+        <button type="button" onclick="closeNoteModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold text-steel hover:text-white hover:bg-twilight/30 transition-colors">Cancel</button>
+        <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-strawberry hover:bg-strawberry/90 shadow-md shadow-strawberry/20 transition-all">Save Note</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Full Screen Markdown Reader Modal -->
+<div id="readModal" class="fixed inset-0 bg-ink/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-3 sm:p-6">
+  <div class="bg-[#131927] rounded-3xl max-w-4xl w-full h-[90vh] flex flex-col border border-twilight/50 shadow-2xl overflow-hidden animate-fade-in">
+    <!-- Reader Header -->
+    <div class="p-4 sm:p-5 border-b border-twilight/30 flex items-center justify-between gap-4 bg-ink/50 shrink-0">
+      <div class="min-w-0">
+        <span id="readSubject" class="text-[10px] font-bold text-strawberry bg-strawberry/10 border border-strawberry/20 px-2 py-0.5 rounded uppercase">Subject</span>
+        <h2 id="readTitle" class="text-base sm:text-lg font-bold text-white truncate mt-1">Note Title</h2>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <a id="downloadMdBtn" href="#" class="px-3 py-1.5 rounded-lg bg-twilight/40 hover:bg-twilight/70 border border-twilight/50 text-xs font-bold text-white flex items-center gap-1 transition-colors">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Markdown</span>
+        </a>
+        <a id="printPdfBtn" href="#" target="_blank" class="px-3 py-1.5 rounded-lg bg-twilight/40 hover:bg-twilight/70 border border-twilight/50 text-xs font-bold text-white flex items-center gap-1 transition-colors">
+          <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Print / PDF</span>
+        </a>
+        <button onclick="closeReadModal()" class="p-2 rounded-lg text-steel hover:text-white hover:bg-twilight/40 transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Reader Scrollable Body -->
+    <div class="flex-1 p-6 sm:p-10 overflow-y-auto bg-[#0e131f]/60 text-slate-100">
+      <div id="readBody" class="prose prose-invert max-w-none text-slate-200">
+        <!-- Rendered with Marked.js -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function openNoteModal() {
+    document.getElementById('noteModal').classList.remove('hidden');
+  }
+
+  function closeNoteModal() {
+    document.getElementById('noteModal').classList.add('hidden');
+  }
+
+  function readNote(id, title, subject, rawContent) {
+    document.getElementById('readTitle').innerText = title;
+    document.getElementById('readSubject').innerText = subject;
+    document.getElementById('downloadMdBtn').href = `/notes/download/${id}?format=md`;
+    document.getElementById('printPdfBtn').href = `/notes/download/${id}?format=pdf`;
+    
+    // Parse markdown using marked.js
+    const renderedHtml = typeof marked !== 'undefined' ? marked.parse(rawContent || "") : rawContent;
+    document.getElementById('readBody').innerHTML = renderedHtml;
+    
+    // Trigger KaTeX math rendering if available
+    if (window.renderMathInElement) {
+      renderMathInElement(document.getElementById('readBody'));
+    }
+
+    document.getElementById('readModal').classList.remove('hidden');
+    lucide.createIcons();
+  }
+
+  function closeReadModal() {
+    document.getElementById('readModal').classList.add('hidden');
+  }
+
+  // Pre-open note if note_id in URL params
+  document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const noteId = params.get('note_id');
+    if (noteId) {
+      fetch(`/api/notes`)
+        .then(res => res.json())
+        .then(data => {
+          const n = (data.notes || []).find(x => x.id === noteId);
+          if (n) {
+            readNote(n.id, n.title, n.subject, n.content);
+          }
+        });
+    }
+  });
+</script>
+{% endblock %}

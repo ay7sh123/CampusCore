@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Profile Settings &bull; CAMPUSCORE{% endblock %}
+{% block header_title %}Student Profile &amp; Settings{% endblock %}
+{% block header_subtitle %}Manage your academic profile, enrolled subjects &amp; account security{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-5xl mx-auto">
+
+  <!-- Profile Header Card -->
+  <div class="bg-[#131927] rounded-3xl p-6 sm:p-8 border border-twilight/40 shadow-sm flex flex-col sm:flex-row items-center gap-6">
+    <div class="w-20 h-20 rounded-3xl flex items-center justify-center text-white font-black text-3xl shadow-lg shrink-0 border border-twilight/50" style="background-color: {{ user.avatar_color or '#ff0035' }}">
+      {{ user.name[:2]|upper }}
+    </div>
+
+    <div class="flex-1 text-center sm:text-left min-w-0">
+      <div class="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+        <h2 class="text-2xl font-extrabold text-white tracking-tight">{{ user.name }}</h2>
+        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-strawberry/20 text-strawberry border border-strawberry/30">
+          {{ user.role|capitalize }}
+        </span>
+      </div>
+      <p class="text-xs text-steel mt-1">{{ user.email }} &bull; @{{ user.username }}</p>
+      <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-3 text-xs font-semibold text-steel">
+        <span class="px-2.5 py-1 rounded-lg bg-ink/70 border border-twilight/40 text-white">🎓 {{ user.level|capitalize }}</span>
+        <span class="px-2.5 py-1 rounded-lg bg-ink/70 border border-twilight/40 text-white">🏛️ {{ user.board or 'CBSE' }}</span>
+        {% if user.program %}
+        <span class="px-2.5 py-1 rounded-lg bg-ink/70 border border-twilight/40 text-white">📘 {{ user.program }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Academic Summary Cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div class="bg-[#131927] p-4 rounded-2xl border border-twilight/40 shadow-sm text-center">
+      <div class="text-2xl font-black {% if att_stats.percentage >= 75 %}text-emerald-400{% else %}text-strawberry{% endif %}">{{ att_stats.percentage }}%</div>
+      <div class="text-[11px] font-bold text-steel mt-1 uppercase">Attendance</div>
+    </div>
+    <div class="bg-[#131927] p-4 rounded-2xl border border-twilight/40 shadow-sm text-center">
+      <div class="text-2xl font-black text-amber-400">🔥 {{ att_stats.streak }}</div>
+      <div class="text-[11px] font-bold text-steel mt-1 uppercase">Day Streak</div>
+    </div>
+    <div class="bg-[#131927] p-4 rounded-2xl border border-twilight/40 shadow-sm text-center">
+      <div class="text-2xl font-black text-white">{{ task_stats.completed }}</div>
+      <div class="text-[11px] font-bold text-steel mt-1 uppercase">Tasks Done</div>
+    </div>
+    <div class="bg-[#131927] p-4 rounded-2xl border border-twilight/40 shadow-sm text-center">
+      <div class="text-2xl font-black text-strawberry">{{ notes_count }}</div>
+      <div class="text-[11px] font-bold text-steel mt-1 uppercase">Study Notes</div>
+    </div>
+  </div>
+
+  <!-- Settings Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    
+    <!-- Edit Academic Details -->
+    <div class="bg-[#131927] rounded-3xl p-6 sm:p-7 border border-twilight/40 shadow-sm">
+      <h3 class="text-base font-bold text-white mb-1">Academic &amp; Profile Details</h3>
+      <p class="text-xs text-steel mb-5">Update your displayed academic information</p>
+
+      <form method="POST" action="{{ url_for('profile') }}" class="space-y-4">
+        <input type="hidden" name="action" value="update_info">
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1">Full Name</label>
+          <input type="text" name="name" value="{{ user.name }}" required class="w-full px-3.5 py-2.5 rounded-xl border border-twilight/50 text-sm font-medium text-white bg-ink/70 outline-none focus:border-strawberry transition-colors">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1">Class / Degree Program</label>
+          <input type="text" name="program" value="{{ user.program or '' }}" placeholder="e.g. B.Tech Computer Science" class="w-full px-3.5 py-2.5 rounded-xl border border-twilight/50 text-sm font-medium text-white bg-ink/70 outline-none focus:border-strawberry transition-colors">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1">Section / Class</label>
+            <input type="text" name="class_name" value="{{ user.class_name or '' }}" placeholder="Sec A" class="w-full px-3.5 py-2.5 rounded-xl border border-twilight/50 text-sm font-medium text-white bg-ink/70 outline-none focus:border-strawberry transition-colors">
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1">Board / University</label>
+            <select name="board" class="w-full px-3.5 py-2.5 rounded-xl border border-twilight/50 text-sm font-medium text-white bg-ink/70 outline-none focus:border-strawberry transition-colors">
+              <option value="CBSE" class="bg-ink text-white" {% if user.board == 'CBSE' %}selected{% endif %}>CBSE</option>
+              <option value="ICSE" class="bg-ink text-white" {% if user.board == 'ICSE' %}selected{% endif %}>ICSE</option>
+              <option value="State Board" class="bg-ink text-white" {% if user.board == 'State Board' %}selected{% endif %}>State Board</option>
+              <option value="University" class="bg-ink text-white" {% if user.board == 'University' %}selected{% endif %}>University</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1.5">Avatar Color Theme</label>
+          <div class="flex items-center gap-3">
+            {% for c in ['#ff0035', '#38405f', '#59546c', '#8b939c', '#6C63FF', '#4ECDC4', '#FFA07A'] %}
+            <label class="cursor-pointer">
+              <input type="radio" name="avatar_color" value="{{ c }}" {% if user.avatar_color == c %}checked{% endif %} class="peer sr-only">
+              <div class="w-8 h-8 rounded-full peer-checked:ring-4 peer-checked:ring-strawberry transition-all shadow-sm" style="background-color: {{ c }}"></div>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="pt-2">
+          <button type="submit" class="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white bg-strawberry hover:bg-strawberry/90 shadow-md shadow-strawberry/20 transition-all">
+            Save Profile Details
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Change Password -->
+    <div class="bg-[#131927] rounded-3xl p-6 sm:p-7 border border-twilight/40 shadow-sm flex flex-col justify-between">
+      <div>
+        <h3 class="text-base font-bold text-white mb-1">Security &amp; Password</h3>
+        <p class="text-xs text-steel mb-5">Keep your account secure with regular updates</p>
+
+        <form method="POST" action="{{ url_for('profile') }}" class="space-y-4">
+          <input type="hidden" name="action" value="change_password">
+
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1">Current Password</label>
+            <input type="password" name="current_password" required placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-xl border border-twilight/50 text-sm font-medium text-white bg-ink/70 outline-none focus:border-strawberry transition-colors">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-steel mb-1">New Password (Min. 6 chars)</label>
+            <input type="password" name="new_password" required minlength="6" placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-xl border border-twilight/50 text-sm font-medium text-white bg-ink/70 outline-none focus:border-strawberry transition-colors">
+          </div>
+
+          <div class="pt-2">
+            <button type="submit" class="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white bg-twilight/50 hover:bg-twilight/80 border border-twilight/50 transition-colors">
+              Update Password
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Enrolled Subjects Strip -->
+      <div class="mt-6 pt-5 border-t border-twilight/30">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-steel">Enrolled Subjects</span>
+          <a href="{{ url_for('subjects_view') }}" class="text-xs font-bold text-strawberry hover:underline">Manage</a>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          {% for s in user_subjects %}
+          <span class="px-2.5 py-1 rounded-lg bg-ink/60 border border-twilight/40 text-xs font-semibold text-steel">
+            {{ s.icon }} {{ s.name }}
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#0e131f]">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}CAMPUSCORE - Student Academic Platform{% endblock %}</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS via CDN with User Custom Palette -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            ink: '#0e131f',
+            twilight: '#38405f',
+            grape: '#59546c',
+            steel: '#8b939c',
+            strawberry: {
+              DEFAULT: '#ff0035',
+              hover: '#d6002c',
+              light: 'rgba(255, 0, 53, 0.15)',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Marked.js for Markdown Rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- KaTeX for Math Equations -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+
+  <!-- Custom Stylesheet with CSS Palette Variables -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  
+  <!-- Instant Theme Loader (Zero Flicker) -->
+  <script>
+    (function() {
+      try {
+        if (localStorage.getItem('campuscore_theme') === 'light') {
+          document.documentElement.classList.add('theme-light');
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full bg-[#0e131f] text-slate-100 flex flex-col md:flex-row antialiased selection:bg-[#ff0035] selection:text-white">
+
+  {% if me %}
+  <!-- Mobile Sidebar Overlay -->
+  <div id="mobileSidebarBackdrop" class="fixed inset-0 bg-[#0e131f]/80 backdrop-blur-sm z-40 hidden md:hidden transition-opacity" onclick="toggleSidebar()"></div>
+
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed md:sticky top-0 left-0 h-screen w-64 bg-[#0a0e17] border-r border-[#38405f] z-50 flex flex-col justify-between transform -translate-x-full md:translate-x-0 transition-transform duration-200 ease-in-out shrink-0">
+    <div class="flex flex-col h-full">
+      <!-- App Brand Header -->
+      <div class="p-5 border-b border-[#38405f]/70 flex items-center justify-between">
+        <a href="{{ url_for('dashboard') }}" class="flex items-center gap-3">
+          <div class="brand-logo-icon w-10 h-10 rounded-xl bg-[#ff0035] flex items-center justify-center text-white font-extrabold text-xl shadow-lg shadow-[#ff0035]/25">
+            C
+          </div>
+          <div>
+            <span class="text-xl font-extrabold tracking-tight text-white">CAMPUSCORE</span>
+            <span class="block text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Academic Portal</span>
+          </div>
+        </a>
+        <button onclick="toggleSidebar()" class="md:hidden text-[#8b939c] hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <div class="px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-[#59546c]">
+          {% if me.role == 'admin' %}Administrator Console{% elif me.role == 'teacher' %}Faculty Portal{% else %}Student Academic Hub{% endif %}
+        </div>
+
+        <a href="{{ url_for('dashboard') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path == url_for('dashboard') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="layout-dashboard" class="w-5 h-5 {% if request.path == url_for('dashboard') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>Dashboard</span>
+        </a>
+
+        {% if me.role == 'student' %}
+        <a href="{{ url_for('attendance_view') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/attendance') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="calendar-check" class="w-5 h-5 {% if request.path.startswith('/attendance') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span class="flex-1">My Attendance</span>
+          <span class="sidebar-badge-75 px-1.5 py-0.5 text-[10px] font-bold rounded {% if request.path.startswith('/attendance') %}bg-white/20 text-white{% else %}bg-[#38405f] text-[#8b939c]{% endif %}">75% Rule</span>
+        </a>
+
+        <a href="{{ url_for('assignments_list') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/assignments') or request.path.startswith('/submissions') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="file-check-2" class="w-5 h-5 {% if request.path.startswith('/assignments') or request.path.startswith('/submissions') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>My Assignments</span>
+        </a>
+
+        <a href="{{ url_for('notes_view') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/notes') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="book-marked" class="w-5 h-5 {% if request.path.startswith('/notes') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>Study Notes</span>
+        </a>
+
+        <a href="{{ url_for('subjects_view') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/subjects') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="book-open" class="w-5 h-5 {% if request.path.startswith('/subjects') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>Enrolled Subjects</span>
+        </a>
+
+        <a href="{{ url_for('notices_list') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/notices') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="bell" class="w-5 h-5 {% if request.path.startswith('/notices') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>Notices &amp; Circulars</span>
+        </a>
+
+        {% elif me.role == 'teacher' %}
+        <a href="{{ url_for('students_list') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/students') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="users" class="w-5 h-5 {% if request.path.startswith('/students') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>My Students</span>
+        </a>
+
+        <a href="{{ url_for('attendance_view') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/attendance') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="calendar-check" class="w-5 h-5 {% if request.path.startswith('/attendance') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span class="flex-1">Attendance Management</span>
+        </a>
+
+        <a href="{{ url_for('assignments_list') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/assignments') or request.path.startswith('/submissions') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="file-text" class="w-5 h-5 {% if request.path.startswith('/assignments') or request.path.startswith('/submissions') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>Manage Assignments</span>
+        </a>
+
+        <a href="{{ url_for('courses_list') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/courses') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="graduation-cap" class="w-5 h-5 {% if request.path.startswith('/courses') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>Course Catalog</span>
+        </a>
+
+        <a href="{{ url_for('tasks_view') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/tasks') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="check-square" class="w-5 h-5 {% if request.path.startswith('/tasks') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>My Tasks</span>
+        </a>
+
+        <a href="{{ url_for('notes_view') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/notes') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="book-marked" class="w-5 h-5 {% if request.path.startswith('/notes') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>Lecture &amp; Study Notes</span>
+        </a>
+
+        <a href="{{ url_for('notices_list') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/notices') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="bell" class="w-5 h-5 {% if request.path.startswith('/notices') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>Notices &amp; Circulars</span>
+        </a>
+
+        {% elif me.role == 'admin' %}
+        <a href="{{ url_for('teachers_list') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/teachers') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="user-check" class="w-5 h-5 {% if request.path.startswith('/teachers') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span class="flex-1">Faculty &amp; Teachers</span>
+          <span class="sidebar-badge px-1.5 py-0.5 text-[10px] font-bold rounded bg-[#38405f] text-slate-200">Admin</span>
+        </a>
+
+        <a href="{{ url_for('students_list') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/students') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="users" class="w-5 h-5 {% if request.path.startswith('/students') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>All Students</span>
+        </a>
+
+        <a href="{{ url_for('attendance_view') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/attendance') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="file-spreadsheet" class="w-5 h-5 {% if request.path.startswith('/attendance') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span class="flex-1">Attendance Reports</span>
+          <span class="sidebar-badge px-1.5 py-0.5 text-[9px] font-semibold rounded bg-[#38405f] text-slate-300">Read-Only</span>
+        </a>
+
+        <a href="{{ url_for('assignments_list') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/assignments') or request.path.startswith('/submissions') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="layers" class="w-5 h-5 {% if request.path.startswith('/assignments') or request.path.startswith('/submissions') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>All Assignments</span>
+        </a>
+
+        <a href="{{ url_for('courses_list') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/courses') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="graduation-cap" class="w-5 h-5 {% if request.path.startswith('/courses') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>Course Catalog</span>
+        </a>
+
+        <a href="{{ url_for('notices_list') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all {% if request.path.startswith('/notices') %}sidebar-active-link bg-[#ff0035] text-white font-bold shadow-md shadow-[#ff0035]/20{% else %}text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white{% endif %}">
+          <i data-lucide="bell" class="w-5 h-5 {% if request.path.startswith('/notices') %}text-white{% else %}text-[#8b939c]{% endif %}"></i>
+          <span>Notices &amp; Circulars</span>
+        </a>
+        {% endif %}
+      </nav>
+
+      <!-- User Profile Card in Sidebar Footer -->
+      <div class="p-3 border-t border-[#38405f]/70 bg-[#0e131f]/60">
+        <a href="{{ url_for('profile') }}" class="flex items-center gap-3 p-2 rounded-xl hover:bg-[#38405f]/30 border border-transparent hover:border-[#38405f] transition-all group">
+          <div class="avatar-badge w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm" style="background-color: {{ me.avatar_color or '#ff0035' }}">
+            {{ me.name[:2]|upper }}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-white truncate group-hover:text-[#ff0035] transition-colors">{{ me.name }}</p>
+            <p class="text-xs text-[#8b939c] truncate">{{ me.program or (me.role|capitalize) }}</p>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-[#8b939c] group-hover:text-white"></i>
+        </a>
+      </div>
+    </div>
+  </aside>
+  {% endif %}
+
+  <!-- Main Content Area -->
+  <div class="flex-1 flex flex-col min-h-screen min-w-0 overflow-y-auto bg-[#0e131f]">
+    {% if me %}
+    <!-- Top Header -->
+    <header class="sticky top-0 z-30 bg-[#0a0e17]/90 backdrop-blur-md border-b border-[#38405f] px-4 md:px-8 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-xl text-[#8b939c] hover:text-white hover:bg-[#38405f]/40">
+          <i data-lucide="menu" class="w-6 h-6"></i>
+        </button>
+        <div>
+          <h1 class="text-lg md:text-xl font-bold text-white tracking-tight">{% block header_title %}CAMPUSCORE Dashboard{% endblock %}</h1>
+          <p class="text-xs text-[#8b939c] hidden sm:block">{% block header_subtitle %}Academic Excellence &amp; Campus Hub{% endblock %}</p>
+        </div>
+      </div>
+
+      <!-- Quick Actions in Header -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Theme Toggle Button -->
+        <button type="button" onclick="toggleTheme()" title="Toggle Dark / Light Mode" class="p-2 rounded-xl text-[#8b939c] hover:text-white hover:bg-[#38405f]/40 transition-colors flex items-center justify-center">
+          <span class="theme-toggle-icon text-sm">☀️</span>
+        </button>
+
+        {% if me.role == 'admin' %}
+        <a href="{{ url_for('teachers_list') }}" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#38405f]/50 text-white hover:bg-[#38405f] font-semibold text-xs border border-[#59546c] transition-colors">
+          <i data-lucide="user-check" class="w-3.5 h-3.5 text-[#ff0035]"></i>
+          <span>Assign Faculty</span>
+        </a>
+        {% endif %}
+
+        <a href="{{ url_for('profile') }}" title="Profile Settings" class="p-2 rounded-lg text-[#8b939c] hover:bg-[#38405f]/40 hover:text-white transition-colors">
+          <i data-lucide="user-cog" class="w-5 h-5"></i>
+        </a>
+
+        <a href="{{ url_for('logout') }}" title="Sign Out" class="p-2 rounded-lg text-[#ff0035] hover:bg-[#ff0035]/15 transition-colors">
+          <i data-lucide="log-out" class="w-5 h-5"></i>
+        </a>
+      </div>
+    </header>
+    {% endif %}
+
+    <!-- Flash Notifications Container -->
+    <div class="px-4 md:px-8 pt-4">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="mb-4 p-4 rounded-xl flex items-center justify-between shadow-sm animate-fade-in {% if category == 'ok' %}bg-[#161c2e] border border-[#38405f] text-emerald-400{% else %}bg-[#161c2e] border border-[#ff0035] text-[#ff0035]{% endif %}">
+              <div class="flex items-center gap-3">
+                <i data-lucide="{% if category == 'ok' %}check-circle-2{% else %}alert-circle{% endif %}" class="w-5 h-5 shrink-0"></i>
+                <span class="text-sm font-medium">{{ message }}</span>
+              </div>
+              <button onclick="this.parentElement.remove()" class="text-[#8b939c] hover:text-white">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+
+    <!-- Main Body Block -->
+    <main class="flex-1 p-4 md:p-8">
+      {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-[#38405f]/50 bg-[#0a0e17] py-4 px-4 md:px-8 text-center text-xs text-[#8b939c]">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-7xl mx-auto">
+        <span>CAMPUSCORE &bull; Powered by Flask &amp; MongoDB Atlas</span>
+        <span class="text-slate-400">CBSE &amp; University Aligned Academic Suite</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    function updateThemeIcons() {
+      const isLight = document.documentElement.classList.contains('theme-light');
+      document.querySelectorAll('.theme-toggle-icon').forEach(el => {
+        el.textContent = isLight ? '🌙' : '☀️';
+      });
+    }
+
+    function toggleTheme() {
+      const isCurrentlyLight = document.documentElement.classList.contains('theme-light');
+      if (isCurrentlyLight) {
+        document.documentElement.classList.remove('theme-light');
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem('campuscore_theme', 'dark');
+      } else {
+        document.documentElement.classList.add('theme-light');
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('campuscore_theme', 'light');
+      }
+      updateThemeIcons();
+    }
+
+    document.addEventListener('DOMContentLoaded', updateThemeIcons);
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('mobileSidebarBackdrop');
+      if (sidebar && backdrop) {
+        const isHidden = sidebar.classList.contains('-translate-x-full');
+        if (isHidden) {
+          sidebar.classList.remove('-translate-x-full');
+          backdrop.classList.remove('hidden');
+        } else {
+          sidebar.classList.add('-translate-x-full');
+          backdrop.classList.add('hidden');
+        }
+      }
+    }
+  </script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

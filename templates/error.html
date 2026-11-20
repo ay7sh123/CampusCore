@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Error {{ code }} &bull; CAMPUSCORE{% endblock %}
+
+{% block content %}
+<div class="min-h-[70vh] flex items-center justify-center py-12 px-4">
+  <div class="text-center max-w-md">
+    <div class="w-16 h-16 rounded-3xl bg-strawberry/20 border border-strawberry/30 text-strawberry flex items-center justify-center font-black text-2xl mx-auto mb-4">
+      {{ code }}
+    </div>
+    <h2 class="text-2xl font-extrabold text-white tracking-tight">Something Went Wrong</h2>
+    <p class="text-sm text-steel mt-2 leading-relaxed">
+      {{ msg or "An unexpected error occurred while processing your request." }}
+    </p>
+
+    <div class="mt-6 flex items-center justify-center gap-3">
+      <a href="{{ url_for('dashboard') }}" class="px-5 py-2.5 rounded-xl bg-strawberry hover:bg-strawberry/90 text-white text-xs font-bold shadow-md shadow-strawberry/20 transition-all">
+        Return to Dashboard
+      </a>
+      <a href="{{ url_for('landing') }}" class="px-4 py-2.5 rounded-xl bg-twilight/40 hover:bg-twilight/70 border border-twilight/50 text-white text-xs font-bold transition-colors">
+        Home Page
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

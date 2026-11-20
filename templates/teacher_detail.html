@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% block title %}{{ teacher.name }} &bull; Faculty Section &bull; CAMPUSCORE{% endblock %}
+{% block header_title %}{{ teacher.name }}'s Academic Section{% endblock %}
+{% block header_subtitle %}Manage student allocations (Many-to-Many), course assignments, and attendance oversight{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-6xl mx-auto">
+
+  <!-- Back Link & Action Header -->
+  <div class="flex items-center justify-between">
+    <a href="{{ url_for('teachers_list') }}" class="inline-flex items-center gap-1.5 text-xs font-bold text-[#8b939c] hover:text-white transition-colors">
+      <i data-lucide="arrow-left" class="w-4 h-4"></i>
+      <span>Back to All Faculty</span>
+    </a>
+
+    <div class="flex items-center gap-2">
+      <span class="px-3 py-1 rounded-full text-xs font-bold bg-[#ff0035]/20 text-[#ff0035] border border-[#ff0035]/30">
+        {{ students|length }} Student(s) Assigned
+      </span>
+    </div>
+  </div>
+
+  <!-- Teacher Profile Overview Card -->
+  <div class="bg-[#161c2e] rounded-3xl p-6 sm:p-8 border border-[#38405f] shadow-xl">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-[#38405f]">
+      <div class="flex items-center gap-4">
+        <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-extrabold text-2xl shadow-lg avatar-badge" style="background-color: {{ teacher.avatar_color or '#38405f' }}">
+          {{ teacher.name[:2]|upper }}
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-2xl font-extrabold text-white">{{ teacher.name }}</h2>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#38405f] text-slate-200 border border-[#59546c]/40">
+              Faculty Professor
+            </span>
+          </div>
+          <p class="text-xs text-[#8b939c] mt-1">{{ teacher.department }} &bull; {{ teacher.email }}</p>
+          <p class="text-[11px] text-[#59546c] font-mono mt-0.5">Username: @{{ teacher.username }}</p>
+        </div>
+      </div>
+
+      <!-- Quick Counts -->
+      <div class="flex items-center gap-4">
+        <div class="p-4 rounded-2xl bg-[#0e131f] border border-[#38405f] text-center min-w-[110px]">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Assigned Students</span>
+          <div class="text-2xl font-extrabold text-blue-400 mt-0.5" id="assignedCountBadge">{{ students|length }}</div>
+        </div>
+        <div class="p-4 rounded-2xl bg-[#0e131f] border border-[#38405f] text-center min-w-[110px]">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Courses</span>
+          <div class="text-2xl font-extrabold text-purple-400 mt-0.5">{{ courses|length }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assigned Courses Chips -->
+    <div class="mt-6">
+      <span class="text-xs font-bold uppercase tracking-wider text-[#8b939c] block mb-2">Teaching Subjects &amp; Courses</span>
+      {% if courses %}
+      <div class="flex flex-wrap gap-2">
+        {% for c in courses %}
+        <span class="px-3 py-1.5 rounded-xl bg-[#0e131f] border border-[#38405f] text-xs font-semibold text-slate-200 flex items-center gap-2">
+          <span class="text-[#ff0035] font-mono font-bold">{{ c.code }}</span>
+          <span>{{ c.name }}</span>
+        </span>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-xs text-[#8b939c]">No teaching courses assigned yet.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Search Filter Bar -->
+  <div class="bg-[#161c2e] p-4 rounded-2xl border border-[#38405f] shadow-md flex items-center gap-3">
+    <i data-lucide="search" class="w-5 h-5 text-[#8b939c] shrink-0"></i>
+    <input type="text" id="studentSearchInput" oninput="filterAllStudents()" placeholder="Search students across both sections by name, roll number, or department..." class="w-full bg-transparent text-xs text-white placeholder-[#8b939c] outline-none">
+    <button onclick="clearSearch()" class="text-xs text-[#8b939c] hover:text-white shrink-0 px-2">Clear</button>
+  </div>
+
+
+  <!-- ==================== SECTION 1: ASSIGNED STUDENTS ==================== -->
+  <div class="bg-[#161c2e] rounded-3xl p-6 sm:p-7 border border-[#38405f] shadow-lg" id="assignedSection">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-3 border-b border-[#38405f]">
+      <div>
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i data-lucide="user-check" class="w-5 h-5 text-emerald-400"></i>
+          <span>1. Assigned Students ({{ students|length }})</span>
+        </h3>
+        <p class="text-xs text-[#8b939c]">Students currently mentored by {{ teacher.name }}. You can remove or transfer them below.</p>
+      </div>
+    </div>
+
+    {% if students %}
+    <div class="overflow-x-auto rounded-2xl border border-[#38405f]">
+      <table class="w-full text-left border-collapse text-xs" id="assignedTable">
+        <thead>
+          <tr class="bg-[#0e131f] text-[11px] font-bold uppercase tracking-wider text-[#8b939c] border-b border-[#38405f]">
+            <th class="p-3.5">Roll No</th>
+            <th class="p-3.5">Student Name</th>
+            <th class="p-3.5">Department</th>
+            <th class="p-3.5">Attendance</th>
+            <th class="p-3.5">Submissions</th>
+            <th class="p-3.5 text-center">Transfer to Faculty</th>
+            <th class="p-3.5 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[#38405f]/40">
+          {% for s in students %}
+          <tr class="student-assigned-row hover:bg-[#0e131f]/50 transition-colors" data-name="{{ s.name|lower }}" data-roll="{{ s.roll_no|lower }}" data-dept="{{ s.department|lower }}">
+            <td class="p-3.5 font-mono font-bold text-[#ff0035]">{{ s.roll_no }}</td>
+            <td class="p-3.5 font-bold text-white">
+              <a href="{{ url_for('student_profile_view', sid=s.user_id or s._id) }}" class="hover:text-[#ff0035] hover:underline transition-colors">
+                {{ s.name }}
+              </a>
+              <span class="block text-[10px] text-[#8b939c] font-normal font-mono">{{ s.email }}</span>
+            </td>
+            <td class="p-3.5 text-slate-300">{{ s.department }}</td>
+            <td class="p-3.5">
+              <span class="font-bold {% if (s.attendance_pct or 0) >= 75 %}text-emerald-400{% else %}text-[#ff0035]{% endif %}">
+                {{ s.attendance_pct or 0 }}%
+              </span>
+            </td>
+            <td class="p-3.5 text-slate-300 font-semibold">{{ s.submissions_count or 0 }} Work(s)</td>
+
+            <!-- Transfer Dropdown -->
+            <td class="p-3.5 text-center">
+              {% if other_teachers %}
+              <form method="POST" action="{{ url_for('teacher_transfer_student', tid=teacher._id) }}" class="inline-flex items-center gap-1.5" onsubmit="return confirm('Transfer {{ s.name }} to selected teacher?');">
+                <input type="hidden" name="student_id" value="{{ s.user_id or s._id }}">
+                <select name="target_teacher_id" required class="px-2.5 py-1 rounded-lg border border-[#38405f] text-xs text-white bg-[#0e131f] outline-none focus:border-[#ff0035]">
+                  <option value="">Transfer to...</option>
+                  {% for ot in other_teachers %}
+                  <option value="{{ ot._id }}">{{ ot.name }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="px-2.5 py-1 rounded-lg bg-[#38405f] hover:bg-[#59546c] text-white text-[11px] font-bold transition-colors">
+                  Transfer
+                </button>
+              </form>
+              {% else %}
+              <span class="text-[11px] text-[#8b939c]">No other faculty</span>
+              {% endif %}
+            </td>
+
+            <!-- Remove Button & Profile -->
+            <td class="p-3.5 text-right space-x-2">
+              <a href="{{ url_for('student_profile_view', sid=s.user_id or s._id) }}" class="px-2.5 py-1.5 rounded-lg bg-[#38405f]/40 hover:bg-[#38405f] text-white text-xs font-semibold transition-colors inline-block">
+                Profile
+              </a>
+
+              <form method="POST" action="{{ url_for('teacher_remove_student', tid=teacher._id) }}" class="inline" onsubmit="return confirm('Remove student {{ s.name }} from {{ teacher.name }}?');">
+                <input type="hidden" name="student_id" value="{{ s.user_id or s._id }}">
+                <button type="submit" class="px-2.5 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/30 text-red-400 border border-red-500/30 text-xs font-bold transition-colors">
+                  Remove
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-10 bg-[#0e131f] rounded-2xl border border-dashed border-[#38405f]">
+      <i data-lucide="users" class="w-10 h-10 text-[#8b939c]/50 mx-auto mb-2"></i>
+      <h4 class="text-sm font-bold text-white">No students currently assigned to {{ teacher.name }}</h4>
+      <p class="text-xs text-[#8b939c] mt-0.5">Select students from the Available Students section below to assign them.</p>
+    </div>
+    {% endif %}
+  </div>
+
+
+  <!-- ==================== SECTION 2: AVAILABLE STUDENTS ==================== -->
+  <div class="bg-[#161c2e] rounded-3xl p-6 sm:p-7 border border-[#38405f] shadow-lg" id="availableSection">
+    <form method="POST" action="{{ url_for('teacher_assign_students', tid=teacher._id) }}" id="bulkAssignForm">
+      
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-3 border-b border-[#38405f]">
+        <div>
+          <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="user-plus" class="w-5 h-5 text-[#ff0035]"></i>
+            <span>2. Available Students ({{ available_students|length }})</span>
+          </h3>
+          <p class="text-xs text-[#8b939c]">
+            Students eligible to be assigned. <strong class="text-slate-200">Multiple teachers are supported</strong>: students assigned to other professors still appear available here.
+          </p>
+        </div>
+
+        {% if available_students %}
+        <div class="flex items-center gap-3 self-start sm:self-auto">
+          <button type="submit" id="btnAssignSelected" class="px-5 py-2.5 rounded-xl bg-[#ff0035] hover:bg-[#d6002c] text-white font-bold text-xs shadow-md shadow-[#ff0035]/25 transition-all flex items-center gap-1.5 shrink-0">
+            <i data-lucide="user-check" class="w-4 h-4"></i>
+            <span>Assign Selected Students</span>
+          </button>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if available_students %}
+      <!-- Select All Toolbar -->
+      <div class="p-3 mb-3 rounded-xl bg-[#0e131f] border border-[#38405f] flex items-center justify-between text-xs">
+        <label class="flex items-center gap-2.5 font-bold text-white cursor-pointer select-none">
+          <input type="checkbox" id="selectAllAvailCheckbox" onchange="toggleSelectAllAvail(this)" class="w-4 h-4 rounded accent-[#ff0035] cursor-pointer">
+          <span>Select All Available Students (<span id="selectedAvailCount">0</span> selected)</span>
+        </label>
+        <span class="text-[11px] text-[#8b939c]">Use checkboxes to bulk-assign multiple students</span>
+      </div>
+
+      <div class="overflow-x-auto rounded-2xl border border-[#38405f]">
+        <table class="w-full text-left border-collapse text-xs" id="availableTable">
+          <thead>
+            <tr class="bg-[#0e131f] text-[11px] font-bold uppercase tracking-wider text-[#8b939c] border-b border-[#38405f]">
+              <th class="p-3.5 w-10 text-center">Select</th>
+              <th class="p-3.5">Roll No</th>
+              <th class="p-3.5">Student Name</th>
+              <th class="p-3.5">Department</th>
+              <th class="p-3.5">Other Assigned Faculty</th>
+              <th class="p-3.5 text-right">Quick Action</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[#38405f]/40">
+            {% for st in available_students %}
+            <tr class="student-available-row hover:bg-[#0e131f]/50 transition-colors" data-name="{{ st.name|lower }}" data-roll="{{ st.roll_no|lower }}" data-dept="{{ st.department|lower }}">
+              <td class="p-3.5 text-center">
+                <input type="checkbox" name="student_ids" value="{{ st.user_id or st._id }}" onchange="updateSelectedCount()" class="avail-student-cb w-4 h-4 rounded accent-[#ff0035] cursor-pointer">
+              </td>
+              <td class="p-3.5 font-mono font-bold text-[#ff0035]">{{ st.roll_no }}</td>
+              <td class="p-3.5 font-bold text-white">
+                <span>{{ st.name }}</span>
+                <span class="block text-[10px] text-[#8b939c] font-normal font-mono">{{ st.email }}</span>
+              </td>
+              <td class="p-3.5 text-slate-300">{{ st.department }}</td>
+              
+              <!-- Currently Assigned Teachers -->
+              <td class="p-3.5">
+                {% if st.assigned_teachers %}
+                  <div class="flex flex-wrap gap-1">
+                    {% for at in st.assigned_teachers %}
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#38405f]/50 text-slate-200 border border-[#38405f]">
+                      👨‍🏫 {{ at.name }}
+                    </span>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <span class="text-[#8b939c] text-[11px] italic">Not assigned to any faculty</span>
+                {% endif %}
+              </td>
+
+              <!-- 1-Click Individual Assign -->
+              <td class="p-3.5 text-right">
+                <button type="button" onclick="assignSingleStudent('{{ st.user_id or st._id }}')" class="px-3 py-1.5 rounded-lg bg-[#38405f] hover:bg-[#ff0035] text-white text-xs font-bold transition-colors">
+                  + Assign
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-10 bg-[#0e131f] rounded-2xl border border-dashed border-[#38405f]">
+        <i data-lucide="check-circle-2" class="w-10 h-10 text-emerald-400 mx-auto mb-2"></i>
+        <h4 class="text-sm font-bold text-white">All platform students are already assigned to {{ teacher.name }}!</h4>
+        <p class="text-xs text-[#8b939c] mt-0.5">Every student is currently mapped to this professor.</p>
+      </div>
+      {% endif %}
+
+    </form>
+  </div>
+
+</div>
+
+<!-- Single Assign Form Helper -->
+<form id="singleAssignForm" method="POST" action="{{ url_for('teacher_assign_students', tid=teacher._id) }}" style="display:none;">
+  <input type="hidden" name="student_ids" id="singleAssignId">
+</form>
+
+<script>
+function filterAllStudents() {
+  const query = document.getElementById("studentSearchInput").value.trim().toLowerCase();
+
+  // Filter Assigned Table
+  const assignedRows = document.querySelectorAll("#assignedTable tbody tr.student-assigned-row");
+  assignedRows.forEach(row => {
+    const name = row.getAttribute("data-name") || "";
+    const roll = row.getAttribute("data-roll") || "";
+    const dept = row.getAttribute("data-dept") || "";
+    if (!query || name.includes(query) || roll.includes(query) || dept.includes(query)) {
+      row.style.display = "";
+    } else {
+      row.style.display = "none";
+    }
+  });
+
+  // Filter Available Table
+  const availRows = document.querySelectorAll("#availableTable tbody tr.student-available-row");
+  availRows.forEach(row => {
+    const name = row.getAttribute("data-name") || "";
+    const roll = row.getAttribute("data-roll") || "";
+    const dept = row.getAttribute("data-dept") || "";
+    if (!query || name.includes(query) || roll.includes(query) || dept.includes(query)) {
+      row.style.display = "";
+    } else {
+      row.style.display = "none";
+    }
+  });
+}
+
+function clearSearch() {
+  document.getElementById("studentSearchInput").value = "";
+  filterAllStudents();
+}
+
+function toggleSelectAllAvail(masterCb) {
+  const cbs = document.querySelectorAll("#availableTable input.avail-student-cb");
+  cbs.forEach(cb => {
+    // Only toggle visible rows
+    const row = cb.closest("tr");
+    if (row && row.style.display !== "none") {
+      cb.checked = masterCb.checked;
+    }
+  });
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  const checked = document.querySelectorAll("#availableTable input.avail-student-cb:checked");
+  const countEl = document.getElementById("selectedAvailCount");
+  if (countEl) {
+    countEl.textContent = checked.length;
+  }
+}
+
+function assignSingleStudent(studentId) {
+  document.getElementById("singleAssignId").value = studentId;
+  document.getElementById("singleAssignForm").submit();
+}
+</script>
+{% endblock %}

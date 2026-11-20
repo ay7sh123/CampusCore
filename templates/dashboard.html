@@ -1,0 +1,622 @@
+{% extends "base.html" %}
+{% block title %}Dashboard &bull; CAMPUSCORE{% endblock %}
+{% block header_title %}
+  {% if me.role == 'admin' %}Administrator Central Hub{% elif me.role == 'teacher' %}Faculty Command Center{% else %}Student Academic Hub{% endif %}
+{% endblock %}
+{% block header_subtitle %}
+  {% if me.role == 'admin' %}Platform metrics, faculty management &amp; attendance oversight
+  {% elif me.role == 'teacher' %}Course management, student attendance &amp; assignment evaluation
+  {% else %}Overview of your academic progress, attendance safety &amp; assignments{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-7xl mx-auto">
+
+  <!-- ==================== GREETING BANNER ==================== -->
+  <div class="hero-banner rounded-3xl p-6 sm:p-8 text-white border shadow-2xl relative overflow-hidden">
+    <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div>
+        <div class="hero-pill inline-flex items-center gap-2 px-3 py-1 rounded-full backdrop-blur-md text-xs font-bold mb-3 border">
+          {% if me.role == 'admin' %}
+            <span>🛡️ System Administrator &bull; Central Academic Office</span>
+          {% elif me.role == 'teacher' %}
+            <span>👨‍🏫 Faculty Member &bull; {{ me.department or 'Department' }}</span>
+          {% else %}
+            <span>🎓 {{ me.board or 'University' }} &bull; {{ me.program or 'Student' }}</span>
+          {% endif %}
+        </div>
+        <h2 class="hero-title text-2xl sm:text-3xl font-extrabold tracking-tight">
+          {{ greeting }}, {{ me.name }}! 👋
+        </h2>
+        <p class="hero-subtitle mt-2 text-xs sm:text-sm max-w-xl flex items-center gap-2">
+          <i data-lucide="lightbulb" class="w-4 h-4 text-amber-300 shrink-0"></i>
+          <span><strong>Focus:</strong> {{ current_tip }}</span>
+        </p>
+      </div>
+
+      <!-- Role-Specific Quick Actions -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        {% if me.role == 'admin' %}
+          <a href="{{ url_for('teachers_list') }}" class="hero-btn-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all flex items-center gap-2">
+            <i data-lucide="user-check" class="w-4 h-4 text-[#ff0035]"></i>
+            <span>Manage Faculty</span>
+          </a>
+          <a href="{{ url_for('students_list') }}" class="hero-btn-secondary px-4 py-2.5 rounded-xl font-bold text-xs border transition-all flex items-center gap-2">
+            <i data-lucide="users" class="w-4 h-4"></i>
+            <span>All Students</span>
+          </a>
+          <a href="{{ url_for('attendance_view') }}" class="hero-btn-primary px-4 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2">
+            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+            <span>Attendance Reports</span>
+          </a>
+        {% elif me.role == 'teacher' %}
+          <a href="{{ url_for('attendance_view') }}" class="hero-btn-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all flex items-center gap-2">
+            <i data-lucide="calendar-check" class="w-4 h-4 text-emerald-600"></i>
+            <span>Mark Attendance</span>
+          </a>
+          <a href="{{ url_for('assignments_list') }}" class="hero-btn-secondary px-4 py-2.5 rounded-xl font-bold text-xs border transition-all flex items-center gap-2">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span>Create Assignment</span>
+          </a>
+          <a href="{{ url_for('students_list') }}" class="hero-btn-primary px-4 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2">
+            <i data-lucide="users" class="w-4 h-4"></i>
+            <span>My Students</span>
+          </a>
+        {% else %}
+          <a href="{{ url_for('attendance_view') }}" class="hero-btn-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all flex items-center gap-2">
+            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+            <span>75% Bunk Planner</span>
+          </a>
+          <a href="{{ url_for('assignments_list') }}" class="hero-btn-secondary px-4 py-2.5 rounded-xl font-bold text-xs border transition-all flex items-center gap-2">
+            <i data-lucide="file-check-2" class="w-4 h-4"></i>
+            <span>My Assignments</span>
+          </a>
+          <a href="{{ url_for('notes_view') }}" class="hero-btn-primary px-4 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2">
+            <i data-lucide="book-marked" class="w-4 h-4"></i>
+            <span>Study Notes</span>
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==================== 1. STUDENT VIEW ==================== -->
+  {% if me.role == 'student' %}
+
+    <!-- 75% Attendance Health Alert Banner -->
+    <div class="rounded-2xl p-5 border transition-all {% if att_stats.is_safe %}bg-emerald-500/10 border-emerald-500/30 text-emerald-300{% else %}bg-amber-500/10 border-amber-500/30 text-amber-300{% endif %} shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 {% if att_stats.is_safe %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30{% else %}bg-amber-500/20 text-amber-400 border border-amber-500/30{% endif %}">
+          <i data-lucide="{% if att_stats.is_safe %}shield-check{% else %}alert-triangle{% endif %}" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="font-extrabold text-base text-white">
+              {% if att_stats.is_safe %}
+                Attendance Safe Zone &bull; {{ att_stats.percentage }}%
+              {% else %}
+                Attendance Criteria Warning &bull; {{ att_stats.percentage }}% (Below 75%)
+              {% endif %}
+            </h3>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider {% if att_stats.is_safe %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% else %}bg-amber-500/20 text-amber-300 border border-amber-500/30{% endif %}">
+              {% if att_stats.is_safe %}Eligible for Exams{% else %}Action Required{% endif %}
+            </span>
+          </div>
+          <p class="text-xs mt-1 text-[#8b939c]">
+            {% if att_stats.is_safe %}
+              You can safely bunk <strong class="text-white">{{ att_stats.can_bunk }} upcoming class(es)</strong> without falling below the mandatory 75% threshold.
+            {% else %}
+              You must attend the next <strong class="text-white">{{ att_stats.need_to_attend }} consecutive class(es)</strong> to bring your overall attendance to 75%.
+            {% endif %}
+          </p>
+        </div>
+      </div>
+
+      <a href="{{ url_for('attendance_view') }}" class="safety-btn-action px-4 py-2 rounded-xl text-xs font-bold self-end sm:self-auto shrink-0 transition-colors {% if att_stats.is_safe %}safety-btn-safe bg-emerald-500 hover:bg-emerald-600 text-slate-900{% else %}safety-btn-warning bg-amber-500 hover:bg-amber-600 text-slate-900{% endif %}">
+        Open 75% Safety Calculator &rarr;
+      </a>
+    </div>
+
+    <!-- Student Primary 4 KPI Metric Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div class="bg-[#161c2e] p-6 rounded-3xl border border-[#38405f] shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-xs font-bold uppercase tracking-wider text-[#8b939c]">My Attendance</span>
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+            <i data-lucide="percent" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-white">{{ att_stats.percentage }}%</span>
+          <span class="text-xs font-semibold text-[#8b939c]">/ 100%</span>
+        </div>
+        <div class="w-full bg-[#0e131f] h-2 rounded-full mt-3 overflow-hidden border border-[#38405f]">
+          <div class="h-full rounded-full transition-all duration-500 {% if att_stats.is_safe %}bg-emerald-500{% else %}bg-[#ff0035]{% endif %}" style="width: {{ [att_stats.percentage, 100]|min }}%"></div>
+        </div>
+        <p class="text-[11px] text-[#8b939c] mt-2.5 font-medium">
+          {{ att_stats.present }} Present &bull; {{ att_stats.absent }} Absent &bull; {{ att_stats.total_days }} Total
+        </p>
+      </div>
+
+      <div class="bg-[#161c2e] p-6 rounded-3xl border border-[#38405f] shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-xs font-bold uppercase tracking-wider text-[#8b939c]">Attendance Streak</span>
+          <div class="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center">
+            <i data-lucide="flame" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-white">{{ att_stats.streak }}</span>
+          <span class="text-xs font-semibold text-[#8b939c]">Consecutive Days</span>
+        </div>
+        <p class="text-xs text-amber-400 font-bold mt-3">🔥 Habit Discipline</p>
+        <p class="text-[11px] text-[#8b939c] mt-1 font-medium">Daily attendance keeps you exam-ready.</p>
+      </div>
+
+      <div class="bg-[#161c2e] p-6 rounded-3xl border border-[#38405f] shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-xs font-bold uppercase tracking-wider text-[#8b939c]">My Assignments</span>
+          <div class="w-10 h-10 rounded-xl bg-[#ff0035]/15 text-[#ff0035] flex items-center justify-center">
+            <i data-lucide="file-check-2" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-white">{{ student_assignments|length }}</span>
+          <span class="text-xs font-semibold text-[#8b939c]">Assigned</span>
+        </div>
+        <p class="text-xs text-[#8b939c] mt-3 font-semibold">
+          {{ student_submissions|length }} Submitted work(s)
+        </p>
+        <p class="text-[11px] text-[#8b939c] mt-1 font-medium">Keep up with deadlines.</p>
+      </div>
+
+      <div class="bg-[#161c2e] p-6 rounded-3xl border border-[#38405f] shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-xs font-bold uppercase tracking-wider text-[#8b939c]">Faculty Mentors</span>
+          <div class="w-10 h-10 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center">
+            <i data-lucide="user-check" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-white">{{ my_teachers|length }}</span>
+          <span class="text-xs font-semibold text-[#8b939c]">Professors</span>
+        </div>
+        <p class="text-xs text-purple-300 font-semibold mt-3">{{ recent_notes|length }} Study Notes</p>
+        <p class="text-[11px] text-[#8b939c] mt-1 font-medium">{{ my_subjects|length }} Enrolled Subjects</p>
+      </div>
+    </div>
+
+    <!-- My Assigned Faculty Mentors Section -->
+    <div class="bg-[#161c2e] rounded-3xl p-6 border border-[#38405f] shadow-lg">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="user-check" class="w-5 h-5 text-purple-400"></i>
+            <span>My Assigned Faculty Mentors ({{ my_teachers|length }})</span>
+          </h3>
+          <p class="text-xs text-[#8b939c]">Professors and faculty members guiding your academic coursework</p>
+        </div>
+      </div>
+
+      {% if my_teachers %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for t in my_teachers %}
+        <div class="p-4 rounded-2xl bg-[#0e131f] border border-[#38405f] flex items-center gap-3">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-base shadow-sm shrink-0" style="background-color: {{ t.avatar_color or '#38405f' }}">
+            {{ t.name[:2]|upper }}
+          </div>
+          <div class="min-w-0 flex-1">
+            <h4 class="text-sm font-bold text-white truncate">{{ t.name }}</h4>
+            <p class="text-xs text-[#8b939c] truncate">{{ t.department or 'Faculty' }}</p>
+            <p class="text-[11px] text-[#59546c] font-mono truncate">{{ t.email }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center py-6 bg-[#0e131f] rounded-2xl border border-dashed border-[#38405f]">
+        <p class="text-xs text-[#8b939c]">No faculty mentors currently assigned.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Student Assignments & Submissions Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      
+      <!-- My Active Assignments Card -->
+      <div class="bg-[#161c2e] rounded-3xl p-6 border border-[#38405f] shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="file-text" class="w-5 h-5 text-[#ff0035]"></i>
+              <span>My Course Assignments</span>
+            </h3>
+            <p class="text-xs text-[#8b939c]">Assignments given by your faculty</p>
+          </div>
+          <a href="{{ url_for('assignments_list') }}" class="text-xs font-bold text-[#ff0035] hover:underline">
+            View All &rarr;
+          </a>
+        </div>
+
+        {% if student_assignments %}
+        <div class="space-y-3">
+          {% for a in student_assignments %}
+          <div class="p-4 rounded-2xl bg-[#0e131f] border border-[#38405f] hover:border-[#ff0035] transition-all">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[10px] font-bold text-[#8b939c] uppercase">{{ a.subject }}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if a.status_label == 'Graded' %}bg-emerald-500/20 text-emerald-400 border border-emerald-500/30{% elif a.status_label == 'Submitted' %}bg-sky-500/20 text-sky-400 border border-sky-500/30{% else %}bg-amber-500/20 text-amber-400 border border-amber-500/30{% endif %}">
+                {{ a.status_label }}
+              </span>
+            </div>
+            <h4 class="text-sm font-bold text-white mt-1">{{ a.title }}</h4>
+            <div class="flex items-center justify-between mt-3 text-xs text-[#8b939c]">
+              <span>Due: {{ a.due_date }} &bull; {{ a.total_marks }} Marks</span>
+              <a href="{{ url_for('assignment_detail', aid=a._id) }}" class="font-bold text-[#ff0035] hover:underline">
+                {% if a.status_label == 'Graded' %}View Feedback{% elif a.status_label == 'Submitted' %}View Submission{% else %}Submit Work &rarr;{% endif %}
+              </a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 bg-[#0e131f] rounded-2xl border border-dashed border-[#38405f]">
+          <p class="text-xs text-[#8b939c]">No assignments currently assigned.</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Evaluated Work & Feedback -->
+      <div class="bg-[#161c2e] rounded-3xl p-6 border border-[#38405f] shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="award" class="w-5 h-5 text-amber-400"></i>
+              <span>Academic Submissions &amp; Grades</span>
+            </h3>
+            <p class="text-xs text-[#8b939c]">Faculty marks and constructive feedback</p>
+          </div>
+        </div>
+
+        {% if student_submissions %}
+        <div class="space-y-3">
+          {% for sub in student_submissions %}
+          <div class="p-4 rounded-2xl bg-[#0e131f] border border-[#38405f]">
+            <div class="flex items-center justify-between">
+              <h4 class="text-sm font-bold text-white truncate">{{ sub.assignment_title }}</h4>
+              {% if sub.status == 'graded' %}
+                <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-extrabold text-xs border border-emerald-500/30">
+                  {{ sub.marks }} Marks
+                </span>
+              {% else %}
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-400">Under Review</span>
+              {% endif %}
+            </div>
+            {% if sub.feedback %}
+            <div class="mt-2.5 p-3 rounded-xl bg-[#161c2e] border border-[#38405f] text-xs text-slate-200">
+              <strong class="text-amber-300">Teacher Feedback:</strong> {{ sub.feedback }}
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 bg-[#0e131f] rounded-2xl border border-dashed border-[#38405f]">
+          <p class="text-xs text-[#8b939c]">No submitted work yet.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+
+  <!-- ==================== 2. TEACHER VIEW ==================== -->
+  {% elif me.role == 'teacher' %}
+
+    <!-- Teacher 4 KPI Metric Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div class="bg-[#161c2e] p-6 rounded-3xl border border-[#38405f] shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-xs font-bold uppercase tracking-wider text-[#8b939c]">Assigned Students</span>
+          <div class="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center">
+            <i data-lucide="users" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-white">{{ teacher_students|length }}</span>
+          <span class="text-xs font-semibold text-[#8b939c]">Students</span>
+        </div>
+        <p class="text-xs text-blue-300 font-semibold mt-3">Under your mentorship</p>
+        <p class="text-[11px] text-[#8b939c] mt-1 font-medium">Assigned by administration</p>
+      </div>
+
+      <div class="bg-[#161c2e] p-6 rounded-3xl border border-[#38405f] shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-xs font-bold uppercase tracking-wider text-[#8b939c]">Active Assignments</span>
+          <div class="w-10 h-10 rounded-xl bg-[#ff0035]/15 text-[#ff0035] flex items-center justify-center">
+            <i data-lucide="file-text" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-white">{{ teacher_assignments|length }}</span>
+          <span class="text-xs font-semibold text-[#8b939c]">Created</span>
+        </div>
+        <p class="text-xs text-[#ff0035] font-semibold mt-3">Course assignments</p>
+        <p class="text-[11px] text-[#8b939c] mt-1 font-medium">Ready for student submission</p>
+      </div>
+
+      <div class="bg-[#161c2e] p-6 rounded-3xl border border-[#38405f] shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-xs font-bold uppercase tracking-wider text-[#8b939c]">To Evaluate</span>
+          <div class="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center">
+            <i data-lucide="clock" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-white">{{ teacher_pending_submissions|length }}</span>
+          <span class="text-xs font-semibold text-[#8b939c]">Pending</span>
+        </div>
+        <p class="text-xs text-amber-300 font-semibold mt-3">Submissions waiting</p>
+        <p class="text-[11px] text-[#8b939c] mt-1 font-medium">Ready for grading &amp; marks</p>
+      </div>
+
+      <div class="bg-[#161c2e] p-6 rounded-3xl border border-[#38405f] shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-xs font-bold uppercase tracking-wider text-[#8b939c]">Assigned Courses</span>
+          <div class="w-10 h-10 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center">
+            <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-extrabold text-white">{{ teacher_courses|length }}</span>
+          <span class="text-xs font-semibold text-[#8b939c]">Subjects</span>
+        </div>
+        <p class="text-xs text-purple-300 font-semibold mt-3">{{ me.department }}</p>
+        <p class="text-[11px] text-[#8b939c] mt-1 font-medium">Faculty allocation</p>
+      </div>
+    </div>
+
+    <!-- Teacher Row: Assigned Students Quick Preview & Assignments -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      
+      <!-- Assigned Students Section -->
+      <div class="bg-[#161c2e] rounded-3xl p-6 border border-[#38405f] shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="users" class="w-5 h-5 text-blue-400"></i>
+              <span>My Assigned Students ({{ teacher_students|length }})</span>
+            </h3>
+            <p class="text-xs text-[#8b939c]">Students under your direct academic care</p>
+          </div>
+          <a href="{{ url_for('students_list') }}" class="text-xs font-bold text-[#ff0035] hover:underline">
+            View All &rarr;
+          </a>
+        </div>
+
+        {% if teacher_students %}
+        <div class="space-y-3">
+          {% for st in teacher_students %}
+          <div class="p-3.5 rounded-2xl bg-[#0e131f] border border-[#38405f] flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-[#38405f] text-white font-bold text-xs flex items-center justify-center">
+                {{ st.name[:2]|upper }}
+              </div>
+              <div>
+                <h4 class="text-sm font-bold text-white">{{ st.name }}</h4>
+                <p class="text-xs text-[#8b939c] font-mono">{{ st.roll_no }} &bull; {{ st.department }}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-bold {% if st.attendance_pct >= 75 %}text-emerald-400{% else %}text-[#ff0035]{% endif %}">
+                {{ st.attendance_pct }}%
+              </span>
+              <a href="{{ url_for('student_profile_view', sid=st.user_id or st._id) }}" class="px-3 py-1.5 rounded-lg bg-[#38405f]/40 hover:bg-[#38405f] text-white text-xs font-semibold">
+                Profile
+              </a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 bg-[#0e131f] rounded-2xl border border-dashed border-[#38405f]">
+          <p class="text-xs text-[#8b939c]">No students currently assigned to your profile.</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Pending Submissions to Review -->
+      <div class="bg-[#161c2e] rounded-3xl p-6 border border-[#38405f] shadow-lg">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="check-square" class="w-5 h-5 text-amber-400"></i>
+              <span>Submissions Awaiting Grading</span>
+            </h3>
+            <p class="text-xs text-[#8b939c]">Evaluate student responses and assign marks</p>
+          </div>
+          <a href="{{ url_for('assignments_list') }}" class="text-xs font-bold text-[#ff0035] hover:underline">
+            Manage &rarr;
+          </a>
+        </div>
+
+        {% if teacher_pending_submissions %}
+        <div class="space-y-3">
+          {% for sub in teacher_pending_submissions %}
+          <div class="p-3.5 rounded-2xl bg-[#0e131f] border border-[#38405f] flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <h4 class="text-xs font-bold text-white truncate">{{ sub.student_name }}</h4>
+              <p class="text-[11px] text-[#8b939c] truncate">{{ sub.assignment_title }}</p>
+            </div>
+            <a href="{{ url_for('assignment_detail', aid=sub.assignment_id) }}" class="px-3 py-1.5 rounded-lg bg-[#ff0035] hover:bg-[#d6002c] text-white font-bold text-xs shrink-0 shadow-sm">
+              Grade Now
+            </a>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 bg-[#0e131f] rounded-2xl border border-dashed border-[#38405f]">
+          <i data-lucide="check-circle-2" class="w-8 h-8 text-emerald-400 mx-auto mb-2"></i>
+          <p class="text-xs text-[#8b939c]">All pending submissions have been evaluated!</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+
+  <!-- ==================== 3. ADMIN VIEW ==================== -->
+  {% elif me.role == 'admin' %}
+
+    <!-- Admin 6 System Statistics Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div class="bg-[#161c2e] p-5 rounded-2xl border border-[#38405f] shadow-lg text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Total Students</span>
+        <div class="text-2xl font-extrabold text-white mt-1">{{ admin_stats.total_students }}</div>
+        <p class="text-[10px] text-emerald-400 mt-1 font-semibold">Enrolled</p>
+      </div>
+
+      <div class="bg-[#161c2e] p-5 rounded-2xl border border-[#38405f] shadow-lg text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Faculty</span>
+        <div class="text-2xl font-extrabold text-white mt-1">{{ admin_stats.total_teachers }}</div>
+        <p class="text-[10px] text-blue-400 mt-1 font-semibold">Professors</p>
+      </div>
+
+      <div class="bg-[#161c2e] p-5 rounded-2xl border border-[#38405f] shadow-lg text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Courses</span>
+        <div class="text-2xl font-extrabold text-white mt-1">{{ admin_stats.total_courses }}</div>
+        <p class="text-[10px] text-purple-400 mt-1 font-semibold">Curriculum</p>
+      </div>
+
+      <div class="bg-[#161c2e] p-5 rounded-2xl border border-[#38405f] shadow-lg text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Assignments</span>
+        <div class="text-2xl font-extrabold text-white mt-1">{{ admin_stats.total_assignments }}</div>
+        <p class="text-[10px] text-[#ff0035] mt-1 font-semibold">Published</p>
+      </div>
+
+      <div class="bg-[#161c2e] p-5 rounded-2xl border border-[#38405f] shadow-lg text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Submissions</span>
+        <div class="text-2xl font-extrabold text-white mt-1">{{ admin_stats.total_submissions }}</div>
+        <p class="text-[10px] text-amber-400 mt-1 font-semibold">Completed</p>
+      </div>
+
+      <div class="bg-[#161c2e] p-5 rounded-2xl border border-[#38405f] shadow-lg text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Attendance Rate</span>
+        <div class="text-2xl font-extrabold text-white mt-1">{{ admin_stats.attendance_rate }}%</div>
+        <p class="text-[10px] text-emerald-400 mt-1 font-semibold">Platform Average</p>
+      </div>
+    </div>
+
+    <!-- Admin Teacher Management Section -->
+    <div class="bg-[#161c2e] rounded-3xl p-6 sm:p-7 border border-[#38405f] shadow-lg">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-3 border-b border-[#38405f]">
+        <div>
+          <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="user-check" class="w-5 h-5 text-[#ff0035]"></i>
+            <span>Faculty &amp; Teacher Sections ({{ all_teachers_overview|length }})</span>
+          </h3>
+          <p class="text-xs text-[#8b939c]">Click on any teacher to inspect their assigned students and classroom sections</p>
+        </div>
+        <a href="{{ url_for('teachers_list') }}" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#38405f] hover:bg-[#59546c] transition-colors self-start sm:self-auto">
+          Manage All Faculty &rarr;
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {% for t in all_teachers_overview %}
+        <div class="p-5 rounded-2xl bg-[#0e131f] border border-[#38405f] hover:border-[#ff0035] transition-all flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-base shadow-sm" style="background-color: {{ t.avatar_color or '#38405f' }}">
+                {{ t.name[:2]|upper }}
+              </div>
+              <div>
+                <h4 class="text-sm font-bold text-white">{{ t.name }}</h4>
+                <p class="text-xs text-[#8b939c]">{{ t.department }}</p>
+                <p class="text-[11px] text-[#59546c] font-mono">{{ t.email }}</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 py-3 border-y border-[#38405f]/50 text-center my-3">
+              <div>
+                <div class="text-xs font-bold text-blue-400">{{ t.students_count }}</div>
+                <div class="text-[9px] uppercase tracking-wider text-[#8b939c]">Students</div>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-purple-400">{{ t.courses_count }}</div>
+                <div class="text-[9px] uppercase tracking-wider text-[#8b939c]">Courses</div>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-[#ff0035]">{{ t.assignments_count }}</div>
+                <div class="text-[9px] uppercase tracking-wider text-[#8b939c]">Assignments</div>
+              </div>
+            </div>
+          </div>
+
+          <a href="{{ url_for('teacher_detail', tid=t._id) }}" class="mt-2 w-full py-2.5 rounded-xl bg-[#38405f]/40 hover:bg-[#ff0035] text-white text-xs font-bold text-center transition-colors flex items-center justify-center gap-1.5">
+            <span>View Faculty Section &amp; Students</span>
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Admin Attendance Oversight Card (Read-Only) -->
+    <div class="bg-[#161c2e] rounded-3xl p-6 sm:p-7 border border-[#38405f] shadow-lg">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-3 border-b border-[#38405f]">
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <i data-lucide="file-spreadsheet" class="w-5 h-5 text-emerald-400"></i>
+              <span>Attendance Reports &amp; Audit Logs</span>
+            </h3>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#38405f] text-slate-300">Read-Only</span>
+          </div>
+          <p class="text-xs text-[#8b939c]">Administrators have centralized audit visibility; attendance marking is exclusively reserved for faculty teachers</p>
+        </div>
+        <a href="{{ url_for('attendance_view') }}" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#ff0035] hover:bg-[#d6002c] transition-colors self-start sm:self-auto">
+          Open Attendance Reports &rarr;
+        </a>
+      </div>
+
+      {% if recent_attendance_records %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="text-[#8b939c] border-b border-[#38405f]/60 font-semibold">
+              <th class="py-2.5 px-3">Date</th>
+              <th class="py-2.5 px-3">Student</th>
+              <th class="py-2.5 px-3">Marked By Faculty</th>
+              <th class="py-2.5 px-3">Subject</th>
+              <th class="py-2.5 px-3 text-right">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[#38405f]/30">
+            {% for r in recent_attendance_records %}
+            <tr class="hover:bg-[#0e131f]/50 transition-colors">
+              <td class="py-2.5 px-3 font-mono text-white">{{ r.date }}</td>
+              <td class="py-2.5 px-3 font-semibold text-white">
+                {{ r.student_name }} <span class="text-[#8b939c] font-normal font-mono text-[11px]">({{ r.student_roll }})</span>
+              </td>
+              <td class="py-2.5 px-3 text-[#8b939c]">{{ r.teacher_name or 'Faculty' }}</td>
+              <td class="py-2.5 px-3 text-[#8b939c]">{{ r.subject }}</td>
+              <td class="py-2.5 px-3 text-right">
+                <span class="px-2 py-0.5 rounded font-bold text-[10px] {% if r.status in ('Present', 'present') %}bg-emerald-500/20 text-emerald-400{% else %}bg-[#ff0035]/20 text-[#ff0035]{% endif %}">
+                  {{ r.status }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-6 bg-[#0e131f] rounded-2xl border border-dashed border-[#38405f]">
+        <p class="text-xs text-[#8b939c]">No attendance records logged yet.</p>
+      </div>
+      {% endif %}
+    </div>
+
+  {% endif %}
+
+</div>
+{% endblock %}

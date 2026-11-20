@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}
+  {% if me.role == 'teacher' %}My Assigned Students{% else %}All Students Directory{% endif %} &bull; CAMPUSCORE
+{% endblock %}
+{% block header_title %}
+  {% if me.role == 'teacher' %}My Assigned Students
+  {% else %}Student Directory &amp; Faculty Allocation{% endif %}
+{% endblock %}
+{% block header_subtitle %}
+  {% if me.role == 'teacher' %}Academic profiles and performance of students assigned under your mentorship
+  {% else %}Centralized student registry with assigned faculty, academic records &amp; attendance history{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-7xl mx-auto">
+
+  <!-- Search & Role Action Bar -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex flex-1 items-center gap-3 max-w-2xl">
+      <form method="GET" action="{{ url_for('students_list') }}" class="relative flex-1">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#8b939c]">
+          <i data-lucide="search" class="w-4 h-4"></i>
+        </div>
+        <input type="text" name="q" value="{{ q }}" placeholder="Search by student name, roll number, or email..." class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#38405f] text-xs font-medium text-white bg-[#0e131f] outline-none focus:border-[#ff0035] transition-colors">
+      </form>
+
+      {% if me.role == 'admin' and teachers %}
+      <form method="GET" action="{{ url_for('students_list') }}" class="shrink-0">
+        {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+        <select name="teacher_id" onchange="this.form.submit()" class="px-3 py-2.5 rounded-xl border border-[#38405f] text-xs font-semibold text-white bg-[#0e131f] outline-none focus:border-[#ff0035]">
+          <option value="">All Faculty</option>
+          {% for t in teachers %}
+          <option value="{{ t._id }}" {% if request.args.get('teacher_id') == (t._id|string) %}selected{% endif %}>
+            {{ t.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </form>
+      {% endif %}
+    </div>
+
+    {% if me.role == 'admin' %}
+    <button onclick="openStudentModal()" class="px-4 py-2.5 rounded-xl font-bold text-xs text-white bg-[#ff0035] hover:bg-[#d6002c] shadow-md shadow-[#ff0035]/20 transition-all flex items-center gap-1.5 shrink-0 self-start sm:self-auto">
+      <i data-lucide="user-plus" class="w-4 h-4"></i>
+      <span>Enroll New Student</span>
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- Students Roster Card -->
+  <div class="bg-[#161c2e] rounded-3xl p-6 sm:p-7 border border-[#38405f] shadow-lg">
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <h3 class="text-base font-bold text-white">
+          {% if me.role == 'teacher' %}Students Assigned To You{% else %}All Registered Students{% endif %}
+        </h3>
+        <p class="text-xs text-[#8b939c]">
+          {% if me.role == 'teacher' %}You have direct academic visibility into these students only
+          {% else %}Complete institutional roster with faculty allocations{% endif %}
+        </p>
+      </div>
+      <span class="text-xs font-bold text-[#8b939c] px-3 py-1 rounded-full bg-[#0e131f] border border-[#38405f]">
+        {{ rows|length }} Students
+      </span>
+    </div>
+
+    {% if rows %}
+    <div class="overflow-x-auto rounded-2xl border border-[#38405f]">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead>
+          <tr class="bg-[#0e131f] text-[11px] font-bold uppercase tracking-wider text-[#8b939c] border-b border-[#38405f]">
+            <th class="p-3.5">Roll No</th>
+            <th class="p-3.5">Student Name</th>
+            <th class="p-3.5">Department</th>
+            {% if me.role == 'admin' %}
+            <th class="p-3.5">Assigned Faculty</th>
+            {% endif %}
+            <th class="p-3.5">Attendance</th>
+            <th class="p-3.5">Submissions</th>
+            <th class="p-3.5 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[#38405f]/40">
+          {% for s in rows %}
+          <tr class="hover:bg-[#0e131f]/50 transition-colors">
+            <td class="p-3.5 font-bold font-mono text-[#ff0035]">{{ s.roll_no }}</td>
+            <td class="p-3.5 font-bold text-white">
+              <a href="{{ url_for('student_profile_view', sid=s.user_id or s._id) }}" class="hover:text-[#ff0035] hover:underline transition-colors">
+                {{ s.name }}
+              </a>
+              <span class="text-[11px] text-[#8b939c] block font-normal">{{ s.email }}</span>
+            </td>
+            <td class="p-3.5 text-slate-300">{{ s.department }}</td>
+            
+            {% if me.role == 'admin' %}
+            <td class="p-3.5">
+              {% if s.assigned_teachers %}
+              <div class="flex flex-wrap gap-1">
+                {% for t in s.assigned_teachers %}
+                <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[#38405f] text-white border border-[#38405f]">
+                  {{ t.name }}
+                </span>
+                {% endfor %}
+              </div>
+              {% else %}
+              <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#38405f]/50 text-white border border-[#38405f]">
+                {{ s.teacher_names or s.teacher_name or 'Unassigned' }}
+              </span>
+              {% endif %}
+            </td>
+            {% endif %}
+
+            <td class="p-3.5">
+              <span class="font-bold {% if (s.attendance_pct or 0) >= 75 %}text-emerald-400{% else %}text-[#ff0035]{% endif %}">
+                {{ s.attendance_pct or 0 }}%
+              </span>
+            </td>
+
+            <td class="p-3.5 text-slate-300 font-semibold">
+              {{ s.submissions_count or 0 }} Work(s)
+            </td>
+
+            <td class="p-3.5 text-right space-x-2">
+              <a href="{{ url_for('student_profile_view', sid=s.user_id or s._id) }}" class="px-2.5 py-1 rounded-lg bg-[#38405f]/50 hover:bg-[#ff0035] text-white font-bold transition-colors">
+                Academic Profile &rarr;
+              </a>
+
+              {% if me.role == 'admin' %}
+              <button onclick="openAssignModal('{{ s._id }}', '{{ s.name }}', '{{ s.teacher_id or '' }}')" class="px-2.5 py-1 rounded-lg bg-[#0e131f] hover:bg-[#38405f] border border-[#38405f] text-slate-200 font-bold transition-colors" title="Change Assigned Faculty">
+                Reassign
+              </button>
+              <form method="POST" action="{{ url_for('students_delete', sid=s._id) }}" onsubmit="return confirm('Delete student record for {{ s.name }}?');" class="inline">
+                <button type="submit" class="p-1 text-[#8b939c] hover:text-[#ff0035] transition-colors" title="Delete Student">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-12 bg-[#0e131f] rounded-2xl border border-dashed border-[#38405f]">
+      <i data-lucide="users" class="w-10 h-10 text-[#8b939c]/50 mx-auto mb-2"></i>
+      <h4 class="text-sm font-bold text-white">No students found</h4>
+      <p class="text-xs text-[#8b939c] mt-0.5">
+        {% if me.role == 'teacher' %}No students have been assigned to your faculty profile yet.
+        {% else %}No students enrolled matching query.{% endif %}
+      </p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% if me.role == 'admin' %}
+<!-- Enroll Student Modal -->
+<div id="studentModal" class="fixed inset-0 bg-[#0e131f]/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-[#161c2e] rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-[#38405f] shadow-2xl animate-fade-in">
+    <div class="flex items-center justify-between mb-4 pb-3 border-b border-[#38405f]">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-[#ff0035]/20 text-[#ff0035] flex items-center justify-center font-bold">
+          <i data-lucide="user-plus" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">Enroll New Student</h3>
+          <p class="text-[11px] text-[#8b939c]">Register student and create portal account</p>
+        </div>
+      </div>
+      <button onclick="closeStudentModal()" class="text-[#8b939c] hover:text-white">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{{ url_for('students_add') }}" class="space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-[#8b939c] mb-1">Roll Number *</label>
+          <input type="text" name="roll_no" required placeholder="e.g. CS2026-005" class="w-full px-3.5 py-2.5 rounded-xl border border-[#38405f] text-sm font-medium text-white bg-[#0e131f] outline-none focus:border-[#ff0035] transition-colors">
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-[#8b939c] mb-1">Year of Study</label>
+          <select name="year" class="w-full px-3.5 py-2.5 rounded-xl border border-[#38405f] text-sm font-medium text-white bg-[#0e131f] outline-none focus:border-[#ff0035]">
+            <option value="1">Year 1</option>
+            <option value="2" selected>Year 2</option>
+            <option value="3">Year 3</option>
+            <option value="4">Year 4</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-[#8b939c] mb-1">Full Name *</label>
+        <input type="text" name="name" required placeholder="e.g. Priya Sharma" class="w-full px-3.5 py-2.5 rounded-xl border border-[#38405f] text-sm font-medium text-white bg-[#0e131f] outline-none focus:border-[#ff0035]">
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-[#8b939c] mb-1">Email Address *</label>
+        <input type="email" name="email" required placeholder="priya@example.com" class="w-full px-3.5 py-2.5 rounded-xl border border-[#38405f] text-sm font-medium text-white bg-[#0e131f] outline-none focus:border-[#ff0035]">
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-[#8b939c] mb-1">Department *</label>
+        <input type="text" name="department" required placeholder="e.g. Computer Science, Mathematics" class="w-full px-3.5 py-2.5 rounded-xl border border-[#38405f] text-sm font-medium text-white bg-[#0e131f] outline-none focus:border-[#ff0035]">
+      </div>
+
+      <div class="pt-2 flex items-center justify-end gap-3">
+        <button type="button" onclick="closeStudentModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold text-[#8b939c] hover:text-white">Cancel</button>
+        <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#ff0035] hover:bg-[#d6002c] shadow-md shadow-[#ff0035]/20">Save &amp; Enroll</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Reassign Teacher Modal -->
+<div id="assignModal" class="fixed inset-0 bg-[#0e131f]/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-[#161c2e] rounded-3xl p-6 sm:p-7 max-w-md w-full border border-[#38405f] shadow-2xl animate-fade-in">
+    <div class="flex items-center justify-between mb-4 pb-3 border-b border-[#38405f]">
+      <div>
+        <h3 class="text-base font-bold text-white">Assign Faculty Mentor</h3>
+        <p id="modalStudentName" class="text-xs text-[#ff0035] font-semibold mt-0.5"></p>
+      </div>
+      <button onclick="closeAssignModal()" class="text-[#8b939c] hover:text-white">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="{{ url_for('students_assign_teacher') }}" class="space-y-4">
+      <input type="hidden" name="student_id" id="assignStudentId">
+
+      <div>
+        <label class="block text-xs font-bold uppercase tracking-wider text-[#8b939c] mb-1">Select Faculty Teacher *</label>
+        <select name="teacher_id" id="assignTeacherSelect" class="w-full px-3.5 py-2.5 rounded-xl border border-[#38405f] text-sm font-medium text-white bg-[#0e131f] outline-none focus:border-[#ff0035]">
+          <option value="">-- Unassigned --</option>
+          {% for t in teachers %}
+          <option value="{{ t._id }}">{{ t.name }} ({{ t.department }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="pt-2 flex items-center justify-end gap-3">
+        <button type="button" onclick="closeAssignModal()" class="px-4 py-2.5 rounded-xl text-xs font-bold text-[#8b939c] hover:text-white">Cancel</button>
+        <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#ff0035] hover:bg-[#d6002c]">Save Assignment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openStudentModal() {
+    document.getElementById('studentModal').classList.remove('hidden');
+  }
+  function closeStudentModal() {
+    document.getElementById('studentModal').classList.add('hidden');
+  }
+  function openAssignModal(sid, name, currentTid) {
+    document.getElementById('assignStudentId').value = sid;
+    document.getElementById('modalStudentName').textContent = 'Student: ' + name;
+    document.getElementById('assignTeacherSelect').value = currentTid;
+    document.getElementById('assignModal').classList.remove('hidden');
+  }
+  function closeAssignModal() {
+    document.getElementById('assignModal').classList.add('hidden');
+  }
+</script>
+{% endif %}
+{% endblock %}

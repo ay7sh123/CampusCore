@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}{{ student.name }} &bull; Academic Profile &bull; CAMPUSCORE{% endblock %}
+{% block header_title %}Student Academic Record{% endblock %}
+{% block header_subtitle %}Detailed profile, attendance metrics &amp; assignment submission history{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-6xl mx-auto">
+
+  <!-- Student Header Profile Card -->
+  <div class="bg-[#161c2e] rounded-3xl p-6 sm:p-8 border border-[#38405f] shadow-xl">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-[#38405f]">
+      <div class="flex items-center gap-4">
+        <div class="w-16 h-16 rounded-2xl bg-[#ff0035] text-white font-extrabold text-2xl flex items-center justify-center shadow-lg shadow-[#ff0035]/25">
+          {{ student.name[:2]|upper }}
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-2xl font-extrabold text-white">{{ student.name }}</h2>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#38405f] text-slate-200">
+              {{ student.roll_no }}
+            </span>
+          </div>
+          <p class="text-xs text-[#8b939c] mt-1">{{ student.department }} &bull; Year {{ student.year or 2 }}</p>
+          <p class="text-[11px] text-[#59546c] font-mono mt-0.5">{{ student.email }}</p>
+        </div>
+      </div>
+
+      <!-- Assigned Faculty Mentors (Many-to-Many) -->
+      <div class="p-4 rounded-2xl bg-[#0e131f] border border-[#38405f] flex flex-col justify-center sm:min-w-[240px]">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Assigned Faculty Mentor(s)</span>
+        {% if assigned_teachers %}
+        <div class="flex flex-wrap gap-1.5 mt-1.5">
+          {% for t in assigned_teachers %}
+          <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#38405f] text-white border border-[#38405f]">
+            👨‍🏫 {{ t.name }}
+          </span>
+          {% endfor %}
+        </div>
+        {% else %}
+        <span class="text-sm font-bold text-[#8b939c] mt-0.5">Unassigned</span>
+        {% endif %}
+        
+        {% if me.role == 'admin' and teachers %}
+        <form method="POST" action="{{ url_for('students_assign_teacher') }}" class="mt-2.5 flex gap-1.5">
+          <input type="hidden" name="student_id" value="{{ student.user_id or student._id }}">
+          <select name="teacher_id" class="px-2 py-1 rounded-lg border border-[#38405f] text-[11px] font-semibold text-white bg-[#161c2e] outline-none">
+            <option value="">+ Add Faculty Mentor</option>
+            {% for t in teachers %}
+            <option value="{{ t._id }}">{{ t.name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="px-2.5 py-1 rounded-lg bg-[#ff0035] text-white text-[10px] font-bold hover:bg-[#d6002c]">
+            Assign
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Attendance Performance Overview -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+      <div class="bg-[#0e131f] p-4 rounded-2xl border border-[#38405f] text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Attendance Rate</span>
+        <div class="text-2xl font-extrabold {% if att_stats.percentage >= 75 %}text-emerald-400{% else %}text-[#ff0035]{% endif %} mt-1">
+          {{ att_stats.percentage }}%
+        </div>
+      </div>
+
+      <div class="bg-[#0e131f] p-4 rounded-2xl border border-[#38405f] text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Present Sessions</span>
+        <div class="text-2xl font-extrabold text-white mt-1">{{ att_stats.present }}</div>
+      </div>
+
+      <div class="bg-[#0e131f] p-4 rounded-2xl border border-[#38405f] text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Absent Sessions</span>
+        <div class="text-2xl font-extrabold text-[#ff0035] mt-1">{{ att_stats.absent }}</div>
+      </div>
+
+      <div class="bg-[#0e131f] p-4 rounded-2xl border border-[#38405f] text-center">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[#8b939c]">Total Classes</span>
+        <div class="text-2xl font-extrabold text-white mt-1">{{ att_stats.total_days }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Two Column Layout: Attendance Log on Left, Assignments & Submissions on Right -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    
+    <!-- Attendance History Table -->
+    <div class="bg-[#161c2e] rounded-3xl p-6 border border-[#38405f] shadow-lg">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="calendar" class="w-5 h-5 text-emerald-400"></i>
+          <span>Classroom Attendance Log</span>
+        </h3>
+        <span class="text-xs text-[#8b939c]">{{ att_records|length }} Record(s)</span>
+      </div>
+
+      {% if att_records %}
+      <div class="overflow-x-auto rounded-2xl border border-[#38405f]">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="bg-[#0e131f] text-[10px] font-bold uppercase tracking-wider text-[#8b939c] border-b border-[#38405f]">
+              <th class="p-3">Date</th>
+              <th class="p-3">Subject</th>
+              <th class="p-3">Faculty</th>
+              <th class="p-3 text-right">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[#38405f]/40">
+            {% for r in att_records %}
+            <tr class="hover:bg-[#0e131f]/50">
+              <td class="p-3 font-mono text-white">{{ r.date }}</td>
+              <td class="p-3 text-slate-200">{{ r.subject }}</td>
+              <td class="p-3 text-[#8b939c]">{{ r.teacher_name or 'Faculty' }}</td>
+              <td class="p-3 text-right">
+                <span class="px-2 py-0.5 rounded font-bold text-[10px] {% if r.status in ('Present', 'present') %}bg-emerald-500/20 text-emerald-400{% else %}bg-[#ff0035]/20 text-[#ff0035]{% endif %}">
+                  {{ r.status }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-8 bg-[#0e131f] rounded-2xl border border-dashed border-[#38405f]">
+        <p class="text-xs text-[#8b939c]">No attendance history logged yet.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Assignment Submissions & Grades -->
+    <div class="bg-[#161c2e] rounded-3xl p-6 border border-[#38405f] shadow-lg">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="file-check-2" class="w-5 h-5 text-amber-400"></i>
+          <span>Academic Submissions &amp; Grades</span>
+        </h3>
+        <span class="text-xs text-[#8b939c]">{{ submissions|length }} Work(s)</span>
+      </div>
+
+      {% if submissions %}
+      <div class="space-y-3">
+        {% for sub in submissions %}
+        <div class="p-4 rounded-2xl bg-[#0e131f] border border-[#38405f]">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-bold text-white truncate">{{ sub.assignment_title }}</h4>
+            {% if sub.status == 'graded' %}
+              <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 font-extrabold text-xs border border-emerald-500/30">
+                {{ sub.marks }} Marks
+              </span>
+            {% else %}
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-400">Under Review</span>
+            {% endif %}
+          </div>
+          
+          <div class="mt-2 text-xs text-[#8b939c] bg-[#161c2e] p-2.5 rounded-xl border border-[#38405f]/50">
+            <strong class="text-white">Submitted content:</strong> {{ sub.content|truncate(120) }}
+          </div>
+
+          {% if sub.feedback %}
+          <div class="mt-2 text-xs text-amber-300 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
+            <strong>Teacher Feedback:</strong> {{ sub.feedback }}
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center py-8 bg-[#0e131f] rounded-2xl border border-dashed border-[#38405f]">
+        <p class="text-xs text-[#8b939c]">No assignment submissions on record.</p>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
